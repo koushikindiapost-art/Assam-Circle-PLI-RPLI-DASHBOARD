@@ -42,6 +42,7 @@ select,input,button{font:inherit;padding:6px 8px;border:1px solid var(--bd);bord
 <div class="card"><h2>Details (latest 150 rows of current filter)</h2><div class="sc"><table id="tb"></table></div></div>
 <script>
 const SHEET_CSV_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vSXjRjllcFxcj3cbrd5-SncFeZIwbUM6IDnOEz3xQwQMiZewicN1K42xdc_FodwfKZZEmMfHNbluN4L/pub?gid=0&single=true&output=csv';
+window.addEventListener('error',e=>{const x=document.getElementById('rng');if(x)x.textContent='Script error: '+e.message});window.addEventListener('unhandledrejection',e=>{const x=document.getElementById('rng');if(x)x.textContent='Error: '+(e.reason&&e.reason.message||e.reason)});
 let D=[],cur=[],first=true,ds=[];
 const $=i=>document.getElementById(i),F=n=>'₹'+Math.round(n).toLocaleString('en-IN'),E=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fill=(id,k)=>{const v=$(id).value;$(id).innerHTML='<option value="">All</option>'+[...new Set(D.map(r=>r[k]))].sort().map(x=>`<option>${E(x)}</option>`).join('');$(id).value=v};
@@ -95,6 +96,6 @@ ds=D.map(r=>r.dt).filter(Boolean).sort();
 if(first){first=false;$('d1').value=ds[0]||'';$('d2').value=ds[ds.length-1]||''}
 fill('fv','v');fill('fs','s');fill('ff','f');
 $('rng').textContent=D.length+' rows · '+(ds[0]||'?')+' to '+(ds[ds.length-1]||'?')+' · updated '+new Date().toLocaleTimeString()+(sl.length&&!sl.some(m=>+m[1]>12||+m[2]>12)?' · date format unclear: use a yyyy-mm-dd Clean_Date column':'')+(miss.length?' · columns not found: '+miss.join(', '):'');
-go()}catch(e){$('rng').textContent='Could not load data. Use the CSV link (ending output=csv) and make sure the sheet is published to the web.'}}
+go()}catch(e){$('rng').textContent='Could not load data ('+(e.message||e)+'). Check that the sheet is published to the web as CSV.'}}
 load();setInterval(load,300000);
 </script></body></html>
