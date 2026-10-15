@@ -20,7 +20,7 @@ select,input,button{font:inherit;padding:6px 8px;border:1px solid var(--bd);bord
 .lg{font-size:11px;color:var(--mu)}.lg b{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 3px 0 8px}
 </style></head><body>
 <h1>PLI / RPLI Business Dashboard – Assam Circle</h1>
-<div class="sub">Live from Google Sheet · <span id="rng">loading…</span></div>
+<div class="sub">Live from Google Sheet · <span id="rng">v3 · starting…</span></div>
 <div class="card f">
 <label>Division<select id="fv"></select></label><label>Scheme<select id="fs"></select></label><label>Frequency<select id="ff"></select></label>
 <label>From<input type="date" id="d1"></label><label>To<input type="date" id="d2"></label>
@@ -82,7 +82,7 @@ $('dl').onclick=()=>{const c='Date,Scheme,Division,SO,BO,Frequency,Sum Assured,P
 const l=document.createElement('a');l.href=URL.createObjectURL(new Blob([c],{type:'text/csv'}));l.download='assam_pli_rpli_filtered.csv';l.click()};
 async function load(){
 if(SHEET_CSV_URL.startsWith('PASTE')){$('rng').textContent='Paste your published CSV link in SHEET_CSV_URL (see instructions).';return}
-try{const t=await(await fetch(SHEET_CSV_URL+(SHEET_CSV_URL.includes('?')?'&':'?')+'t='+Date.now())).text();
+try{$('rng').textContent='v3 · connecting to Google Sheet…';const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),20000);const t=await(await fetch(SHEET_CSV_URL,{signal:ac.signal})).text();clearTimeout(tm);
 if(/^\s*<(!doctype|html)/i.test(t))throw new Error('html');
 const R=csv(t);let hi=R.findIndex((r,i)=>i<8&&r.some(x=>/AMOUNT|PREMIUM/i.test(x)));if(hi<0)hi=0;
 const H=R[hi].map(x=>x.trim().toUpperCase().replace(/\s+/g,' '));
