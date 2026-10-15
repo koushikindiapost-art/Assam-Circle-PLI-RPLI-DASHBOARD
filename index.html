@@ -41,7 +41,7 @@ select,input,button{font:inherit;padding:6px 8px;border:1px solid var(--bd);bord
 <div class="card"><h2>Top 10 Branch Offices (BO)</h2><div id="bo"></div></div></div>
 <div class="card"><h2>Details (latest 150 rows of current filter)</h2><div class="sc"><table id="tb"></table></div></div>
 <script>
-const SHEET_CSV_URL='PASTE_YOUR_PUBLISHED_CSV_LINK_HERE';
+const SHEET_CSV_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vSXjRjllcFxcj3cbrd5-SncFeZIwbUM6IDnOEz3xQwQMiZewicN1K42xdc_FodwfKZZEmMfHNbluN4L/pub?output=csv';
 let D=[],cur=[],first=true,ds=[];
 const $=i=>document.getElementById(i),F=n=>'₹'+Math.round(n).toLocaleString('en-IN'),E=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fill=(id,k)=>{const v=$(id).value;$(id).innerHTML='<option value="">All</option>'+[...new Set(D.map(r=>r[k]))].sort().map(x=>`<option>${E(x)}</option>`).join('');$(id).value=v};
