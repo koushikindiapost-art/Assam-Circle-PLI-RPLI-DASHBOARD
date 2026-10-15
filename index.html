@@ -1,0 +1,100 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>PLI/RPLI Business Dashboard – Assam Circle</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f6f7f9;--card:#fff;--tx:#1b1f24;--mu:#667085;--bd:#e3e6ea;--a:#c8102e;--b:#1f6feb}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#14161a;--card:#1d2026;--tx:#eceff3;--mu:#98a2b3;--bd:#2d323a;--a:#ff5a73;--b:#5b9dff}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#14161a;--card:#1d2026;--tx:#eceff3;--mu:#98a2b3;--bd:#2d323a;--a:#ff5a73;--b:#5b9dff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.4 system-ui,Segoe UI,Roboto,sans-serif;padding:14px;max-width:1200px;margin:auto}
+h1{font-size:19px;margin:0}.sub{color:var(--mu);font-size:12px;margin-bottom:12px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px;margin-bottom:12px}
+.f{display:flex;flex-wrap:wrap;gap:8px;align-items:end}.f label{font-size:11px;color:var(--mu);display:flex;flex-direction:column;gap:2px}
+select,input,button{font:inherit;padding:6px 8px;border:1px solid var(--bd);border-radius:6px;background:var(--card);color:var(--tx)}button{cursor:pointer;background:var(--b);color:#fff;border:0}
+.k{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px}.k div{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:10px}.k b{display:block;font-size:19px}.k span{font-size:11px;color:var(--mu)}
+.dv{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;margin-bottom:12px}.dc{background:var(--card);border:2px solid var(--bd);border-radius:10px;padding:10px;cursor:pointer}.dc.on{border-color:var(--b)}.dc b{font-size:16px;display:block}.dc .n{font-weight:600;font-size:13px}
+.g{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}h2{font-size:13px;margin:0 0 8px}
+.r{display:grid;grid-template-columns:110px 1fr 90px;gap:6px;align-items:center;margin:4px 0;font-size:12px}.bar{height:12px;background:var(--bd);border-radius:3px;display:flex;overflow:hidden;margin-top:3px}.bar i{display:block;height:100%}.r .bar{margin:0}
+.r2{display:grid;grid-template-columns:22px 1fr 90px;gap:6px;align-items:center;padding:5px 0;border-bottom:1px solid var(--bd);font-size:12px}.r2 b{text-align:right}.nm{font-weight:600}
+.t{display:flex;align-items:end;gap:2px;height:130px}.t i{flex:1;background:var(--b);border-radius:2px 2px 0 0;min-width:3px}
+.dn{display:flex;align-items:center;gap:14px}.dn i{width:110px;height:110px;border-radius:50%;flex:none}
+.sc{overflow:auto;max-height:340px}table{border-collapse:collapse;width:100%;font-size:12px}th,td{padding:5px 7px;border-bottom:1px solid var(--bd);text-align:left;white-space:nowrap}th{position:sticky;top:0;background:var(--card)}.n2{text-align:right}
+.lg{font-size:11px;color:var(--mu)}.lg b{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 3px 0 8px}
+</style></head><body>
+<h1>PLI / RPLI Business Dashboard – Assam Circle</h1>
+<div class="sub">Live from Google Sheet · <span id="rng">loading…</span></div>
+<div class="card f">
+<label>Division<select id="fv"></select></label><label>Scheme<select id="fs"></select></label><label>Frequency<select id="ff"></select></label>
+<label>From<input type="date" id="d1"></label><label>To<input type="date" id="d2"></label>
+<label>Leaderboard rank by<select id="lm"><option value="a">Premium</option><option value="n">Proposals</option></select></label>
+<button id="rs" style="background:var(--mu)">Reset</button><button id="dl">Download filtered CSV</button></div>
+<div class="k" id="k"></div>
+<h2>Division-wise performance <span class="lg">(click a card to filter)</span></h2><div class="dv" id="dv"></div>
+<h2>Division leaderboard</h2>
+<div class="g">
+<div class="card"><h2><span style="color:var(--a)">●</span> PLI leaderboard</h2><div id="lp"></div></div>
+<div class="card"><h2><span style="color:var(--b)">●</span> RPLI leaderboard</h2><div id="lr"></div></div></div>
+<div class="g">
+<div class="card"><h2>Premium by Division <span class="lg"><b style="background:var(--a)"></b>PLI<b style="background:var(--b)"></b>RPLI</span></h2><div id="cd"></div></div>
+<div class="card"><h2>PLI vs RPLI share</h2><div class="dn" id="dn"></div></div>
+<div class="card"><h2>Daily premium</h2><div class="t" id="ct"></div><div class="lg" id="tl"></div></div>
+<div class="card"><h2>Premium by Frequency</h2><div id="cf"></div></div>
+<div class="card"><h2>Top 10 Sub Offices (SO)</h2><div id="so"></div></div>
+<div class="card"><h2>Top 10 Branch Offices (BO)</h2><div id="bo"></div></div></div>
+<div class="card"><h2>Details (latest 150 rows of current filter)</h2><div class="sc"><table id="tb"></table></div></div>
+<script>
+const SHEET_CSV_URL='PASTE_YOUR_PUBLISHED_CSV_LINK_HERE';
+let D=[],cur=[],first=true,ds=[];
+const $=i=>document.getElementById(i),F=n=>'₹'+Math.round(n).toLocaleString('en-IN'),E=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fill=(id,k)=>{const v=$(id).value;$(id).innerHTML='<option value="">All</option>'+[...new Set(D.map(r=>r[k]))].sort().map(x=>`<option>${E(x)}</option>`).join('');$(id).value=v};
+const p2=n=>String(n).padStart(2,'0'),MO={JAN:1,FEB:2,MAR:3,APR:4,MAY:5,JUN:6,JUL:7,AUG:8,SEP:9,OCT:10,NOV:11,DEC:12};
+function nd(s,mdy){s=String(s).trim();let m;if(m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))return m[1]+'-'+p2(m[2])+'-'+p2(m[3]);
+if(m=s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/))return mdy?m[3]+'-'+p2(m[1])+'-'+p2(m[2]):m[3]+'-'+p2(m[2])+'-'+p2(m[1]);
+if(m=s.match(/^(\d{1,2})[\/-]([A-Za-z]{3})[a-z]*[\/-](\d{2,4})/)){const y=m[3].length==2?'20'+m[3]:m[3];return y+'-'+p2(MO[m[2].toUpperCase()]||1)+'-'+p2(m[1])}return ''}
+function csv(t){const R=[];let r=[],c='',q=false;for(let i=0;i<t.length;i++){const h=t[i];if(q){if(h=='"'){if(t[i+1]=='"'){c+='"';i++}else q=false}else c+=h}else if(h=='"')q=true;else if(h==','){r.push(c);c=''}else if(h=='\n'||h=='\r'){if(h=='\r'&&t[i+1]=='\n')i++;r.push(c);R.push(r);r=[];c=''}else c+=h}if(c||r.length){r.push(c);R.push(r)}return R}
+const num=v=>parseFloat(String(v).replace(/[^\d.-]/g,''))||0;
+function grp(a,kf){const m={};a.forEach(r=>{const k=kf(r),g=m[k]=m[k]||{s:0,a:0,n:0,P:0,R:0,r};g.a+=r.a;g.n++;g.s+=r.sa;r.s=='PLI'?g.P+=r.a:g.R+=r.a});return Object.entries(m).sort((x,y)=>y[1].a-x[1].a)}
+function top(id,data,kf,nf,pf){const g=grp(data,kf).slice(0,10),m=Math.max(1,...g.map(x=>x[1].a));
+$(id).innerHTML=g.map(([k,x],i)=>`<div class="r2"><span>${i+1}</span><div><div class="nm">${E(nf(x.r))}</div><div class="lg">${E(pf(x.r))} · ${x.n} proposals</div><div class="bar" style="width:${x.a/m*100}%"><i style="width:${x.P/x.a*100}%;background:var(--a)"></i><i style="width:${x.R/x.a*100}%;background:var(--b)"></i></div></div><b>${F(x.a)}</b></div>`).join('')||'No data'}
+function go(){
+cur=D.filter(r=>(!$('fv').value||r.v==$('fv').value)&&(!$('fs').value||r.s==$('fs').value)&&(!$('ff').value||r.f==$('ff').value)&&(!$('d1').value||!r.dt||r.dt>=$('d1').value)&&(!$('d2').value||!r.dt||r.dt<=$('d2').value));
+const t=cur.reduce((x,r)=>x+r.a,0),sa=cur.reduce((x,r)=>x+r.sa,0),P=cur.filter(r=>r.s=='PLI'),Q=cur.filter(r=>r.s!='PLI'),pa=P.reduce((x,r)=>x+r.a,0);
+$('k').innerHTML=[['Total premium',F(t)],['Proposals',cur.length.toLocaleString('en-IN')],['Sum assured',(sa/1e7).toFixed(2)+' Cr'],['PLI premium',F(pa)+' ('+P.length+')'],['RPLI premium',F(t-pa)+' ('+Q.length+')']].map(x=>`<div><span>${x[0]}</span><b>${x[1]}</b></div>`).join('');
+const gv=grp(cur,r=>r.v),mv=Math.max(1,...gv.map(x=>x[1].a));
+$('dv').innerHTML=gv.map(([k,g])=>`<div class="dc ${$('fv').value==k?'on':''}" data-v="${E(k)}"><span class="n">${E(k)}</span><b>${F(g.a)}</b><span class="lg">${g.n} proposals · ${(g.a/(t||1)*100).toFixed(1)}%</span><div class="bar"><i style="width:${g.P/g.a*100}%;background:var(--a)"></i><i style="width:${g.R/g.a*100}%;background:var(--b)"></i></div></div>`).join('');
+$('cd').innerHTML=gv.map(([k,g])=>`<div class="r"><span>${E(k)}</span><div class="bar" style="width:${g.a/mv*100}%"><i style="width:${g.P/g.a*100}%;background:var(--a)"></i><i style="width:${g.R/g.a*100}%;background:var(--b)"></i></div><span>${F(g.a)}</span></div>`).join('')||'No data';
+const lm=$('lm').value||'a';
+const lb=(id,sc)=>{const m0={};gv.forEach(([k])=>m0[k]={a:0,n:0});cur.filter(r=>(r.s=='PLI')==(sc=='PLI')).forEach(r=>{m0[r.v].a+=r.a;m0[r.v].n++});
+const g=Object.entries(m0).sort((x,y)=>y[1][lm]-x[1][lm]||y[1].a-x[1].a),m=Math.max(1,...g.map(x=>x[1][lm]));
+$(id).innerHTML=g.map(([k,x],i)=>`<div class="r2"><span>${['🥇','🥈','🥉'][i]||i+1}</span><div><div class="nm">${E(k)}</div><div class="lg">${x.n} proposals · ${F(x.a)}</div><div class="bar" style="width:${x[lm]/m*100}%"><i style="width:100%;background:var(--${sc=='PLI'?'a':'b'})"></i></div></div><b>${lm=='a'?F(x.a):x.n}</b></div>`).join('')||'No data'};
+lb('lp','PLI');lb('lr','RPLI');
+const pc=t?pa/t*100:0;$('dn').innerHTML=`<i style="background:conic-gradient(var(--a) 0 ${pc}%,var(--b) ${pc}% 100%)"></i><div>PLI <b>${pc.toFixed(1)}%</b><br>RPLI <b>${(100-pc).toFixed(1)}%</b></div>`;
+const gf=grp(cur,r=>r.f),mf=Math.max(1,...gf.map(x=>x[1].a));
+$('cf').innerHTML=gf.map(([k,g])=>`<div class="r"><span>${E(k)}</span><div class="bar" style="width:${g.a/mf*100}%"><i style="width:100%;background:var(--b)"></i></div><span>${F(g.a)}</span></div>`).join('')||'No data';
+const gt=grp(cur.filter(r=>r.dt),r=>r.dt).sort((x,y)=>x[0]<y[0]?-1:1),mt=Math.max(1,...gt.map(x=>x[1].a));
+$('ct').innerHTML=gt.map(([k,g])=>`<i style="height:${g.a/mt*100}%" title="${k}: ${F(g.a)}"></i>`).join('');
+$('tl').textContent=gt.length?gt[0][0]+' → '+gt[gt.length-1][0]+' · peak '+F(mt):'';
+top('so',cur,r=>r.v+'|'+(r.o||r.h),r=>r.o||r.h,r=>r.v);top('bo',cur.filter(r=>r.b),r=>r.v+'|'+r.o+'|'+r.b,r=>r.b,r=>(r.o||r.h)+' · '+r.v);
+$('tb').innerHTML='<tr><th>Date</th><th>Scheme</th><th>Division</th><th>SO</th><th>BO</th><th>Frequency</th><th class="n2">Sum Assured</th><th class="n2">Premium</th></tr>'+cur.slice().sort((x,y)=>x.dt<y.dt?1:-1).slice(0,150).map(r=>`<tr><td>${r.dt}</td><td>${r.s}</td><td>${E(r.v)}</td><td>${E(r.o)}</td><td>${E(r.b)}</td><td>${E(r.f)}</td><td class="n2">${r.sa.toLocaleString('en-IN')}</td><td class="n2">${r.a.toLocaleString('en-IN')}</td></tr>`).join('')}
+['fv','fs','ff','d1','d2','lm'].forEach(i=>$(i).onchange=go);
+$('dv').onclick=e=>{const c=e.target.closest('.dc');if(c){$('fv').value=$('fv').value==c.dataset.v?'':c.dataset.v;go()}};
+$('rs').onclick=()=>{['fv','fs','ff'].forEach(i=>$(i).value='');$('d1').value=ds[0]||'';$('d2').value=ds[ds.length-1]||'';go()};
+$('dl').onclick=()=>{const c='Date,Scheme,Division,SO,BO,Frequency,Sum Assured,Premium\n'+cur.map(r=>[r.dt,r.s,r.v,r.o,r.b,r.f,r.sa,r.a].map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
+const l=document.createElement('a');l.href=URL.createObjectURL(new Blob([c],{type:'text/csv'}));l.download='assam_pli_rpli_filtered.csv';l.click()};
+async function load(){
+if(SHEET_CSV_URL.startsWith('PASTE')){$('rng').textContent='Paste your published CSV link in SHEET_CSV_URL (see instructions).';return}
+try{const t=await(await fetch(SHEET_CSV_URL+(SHEET_CSV_URL.includes('?')?'&':'?')+'t='+Date.now())).text();
+if(/^\s*<(!doctype|html)/i.test(t))throw new Error('html');
+const R=csv(t);let hi=R.findIndex((r,i)=>i<8&&r.some(x=>/AMOUNT|PREMIUM/i.test(x)));if(hi<0)hi=0;
+const H=R[hi].map(x=>x.trim().toUpperCase().replace(/\s+/g,' '));
+const fd=(al,ex)=>{for(const a of al){const i=H.indexOf(a);if(i>=0)return i}for(const a of al){const i=H.findIndex(h=>h.includes(a)&&!(ex&&h.includes(ex)));if(i>=0)return i}return -1};
+const c={s:fd(['CARRIER','SCHEME','PRODUCT']),v:fd(['DIVISION','DO_NAME','DIV'],'SUB'),sd:fd(['SUB DIVISION','SUB DIV']),h:fd(['HO_NAME','HO NAME']),o:fd(['SO_NAME','SO NAME','SUB OFFICE']),b:fd(['BO_NAME','BO NAME','BRANCH']),dt:fd(['CLEAN_DATE','DATE','CHECKIN']),sa:fd(['SUM_ASSD','SUM ASSURED','SUM']),f:fd(['FREQ']),a:fd(['AMOUNT_PAID','AMOUNT','PREMIUM'])};
+const miss=Object.entries({scheme:c.s,division:c.v<0&&c.sd<0?-1:0,SO:c.o,BO:c.b,date:c.dt,premium:c.a}).filter(x=>x[1]<0).map(x=>x[0]);
+const g=(r,i)=>i>=0?(r[i]||'').trim():'';
+const sl=R.slice(hi+1).map(r=>g(r,c.dt).match(/^(\d{1,2})[\/-](\d{1,2})[\/-]\d{4}/)).filter(Boolean),mdy=sl.some(m=>+m[2]>12)&&!sl.some(m=>+m[1]>12);
+D=R.slice(hi+1).filter(r=>g(r,c.s)).map(r=>{const s=g(r,c.s).toUpperCase();return{s:s.startsWith('RPL')?'RPLI':'PLI',v:g(r,c.v)||g(r,c.sd)||'Unmapped',h:g(r,c.h),o:g(r,c.o),b:g(r,c.b),dt:nd(g(r,c.dt),mdy),sa:num(g(r,c.sa)),f:g(r,c.f)||'Not specified',a:num(g(r,c.a))}});
+ds=D.map(r=>r.dt).filter(Boolean).sort();
+if(first){first=false;$('d1').value=ds[0]||'';$('d2').value=ds[ds.length-1]||''}
+fill('fv','v');fill('fs','s');fill('ff','f');
+$('rng').textContent=D.length+' rows · '+(ds[0]||'?')+' to '+(ds[ds.length-1]||'?')+' · updated '+new Date().toLocaleTimeString()+(sl.length&&!sl.some(m=>+m[1]>12||+m[2]>12)?' · date format unclear: use a yyyy-mm-dd Clean_Date column':'')+(miss.length?' · columns not found: '+miss.join(', '):'');
+go()}catch(e){$('rng').textContent='Could not load data. Use the CSV link (ending output=csv) and make sure the sheet is published to the web.'}}
+load();setInterval(load,300000);
+</script></body></html>
