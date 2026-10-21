@@ -9,6 +9,12 @@
 :root{--navy:#12304a;--blue:#1769aa;--bg:#f3f6fa;--ink:#172b3a;--muted:#657789;--line:#dce4ec;--white:#fff}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);font:14px/1.45 Arial,Helvetica,sans-serif;color:var(--ink)}
 header{background:linear-gradient(115deg,#102b43,#1769aa);color:white;padding:24px clamp(16px,3vw,42px)}
+.ticker{background:#b91c1c;color:#fff;overflow:hidden;white-space:nowrap;font-weight:800;padding:9px 0;letter-spacing:.02em}
+.ticker span{display:inline-block;padding-left:100%;animation:tickermove 22s linear infinite}
+@keyframes tickermove{0%{transform:translateX(0)}100%{transform:translateX(-100%)}}
+.insight{border-left:4px solid #1769aa;background:#eef6fc;border-radius:8px;padding:13px 15px;margin-bottom:16px}
+.insight h2{margin:0 0 6px;font-size:16px;color:#12304a}.insight ul{margin:6px 0 0;padding-left:20px}.insight li{margin:4px 0}
+
 h1{margin:0 0 6px;font-size:clamp(22px,3vw,32px)}header p{margin:0;color:#e0edf8}
 main{max-width:1600px;margin:auto;padding:20px clamp(12px,2vw,28px) 40px}
 .toolbar,.panel,.kpi{background:white;border:1px solid var(--line);border-radius:12px;box-shadow:0 2px 7px #102b4308}
@@ -24,19 +30,16 @@ button{background:var(--blue);color:white;border-color:var(--blue);font-weight:7
 @media(max-width:850px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.grid{grid-template-columns:1fr}.wide{grid-column:auto}.chart{height:310px}}@media(max-width:480px){.kpis{grid-template-columns:1fr 1fr}.kpi{padding:11px}.toolbar .field{min-width:42%}}
 </style></head><body>
 <header><h1>Assam Circle | PLI-RPLI New Indexing</h1><p>Performance dashboard • Ranking is based on total Amount Paid • Filter by date, division and product</p></header>
+<div class="ticker" aria-label="Latest data date"><span id="tickerText">DATA IS AVAILABLE UP TO THE LATEST DATE IN THE SOURCE DATA</span></div>
 <main>
 <div class="toolbar">
 <div class="field"><label>Division</label><select id="division"><option value="">All Divisions</option></select></div>
 <div class="field"><label>Product</label><select id="product"><option value="">PLI + RPLI</option><option value="PLI">PLI</option><option value="RPL">RPLI</option></select></div>
 <div class="field"><label>From date</label><input id="from" type="date"></div>
 <div class="field"><label>To date</label><input id="to" type="date"></div>
-<div class="field"><label>Search office (optional)</label><input id="search" placeholder="SO or BO name"></div>
-<button id="apply">Apply filters</button><button id="reset" class="secondary">Reset</button>
+<div class="field"><label>Search office (optional)</label><select id="search"><option value="">All Offices</option></select></div>
 <div class="status" id="status">Loading data…</div>
-<div class="field" style="flex-basis:100%;min-width:220px"><label>Live Google Sheets CSV URL (optional)</label><input id="sheetUrl" placeholder="Paste published CSV URL, then click Load Google Sheet"></div>
-<button id="loadSheet" class="secondary">Load Google Sheet</button>
-<div class="field"><label>Or upload updated CSV</label><input id="csvFile" type="file" accept=".csv,text/csv"></div>
-<div class="note">For live updates, publish the Google Sheet tab as CSV (File → Share → Publish to web → select the data tab → CSV), paste its published CSV URL, and load it. Keep the source sheet accessible to viewers. The dashboard currently starts with the CSV you supplied.</div>
+<div class="note">Filters update the dashboard automatically. Data is loaded from the configured Google Sheets source.</div>
 </div>
 <div id="subdivisionWarning" class="warn hidden"><b>Subdivision-wise policy count:</b> the uploaded CSV has no SUB_DIVISION column. Add a column named <b>SUB_DIVISION</b> in Google Sheets and fill it for each row to enable this breakdown. Other dashboard sections work without it.</div>
 <div class="kpis">
@@ -45,11 +48,12 @@ button{background:var(--blue);color:white;border-color:var(--blue);font-weight:7
 <div class="kpi"><div class="name">PLI policies</div><div class="value" id="kPli">–</div><div class="sub" id="kPliAmt">Amount paid: –</div></div>
 <div class="kpi"><div class="name">RPLI policies</div><div class="value" id="kRpli">–</div><div class="sub" id="kRpliAmt">Amount paid: –</div></div>
 </div>
+<section class="insight" id="performanceInsights"><h2>Performance Comments</h2><div id="insightText">Performance observations will appear here after data loads.</div></section>
 <div class="grid">
 <section class="panel"><h2>Division performance: PLI vs RPLI</h2><div id="divisionChart" class="chart"></div></section>
 <section class="panel"><h2>Day-wise indexing trend</h2><div id="dailyChart" class="chart"></div></section>
-<section class="panel"><h2>Top 10 Sub Offices by Amount Paid</h2><div id="topSO" class="chart"></div></section>
-<section class="panel"><h2>Bottom 10 Sub Offices by Amount Paid</h2><div id="bottomSO" class="chart"></div></section>
+<section class="panel"><h2>Top 10 Performing Offices</h2><div id="topSO" class="chart"></div></section>
+<section class="panel"><h2>Bottom 10 Performing Offices</h2><div id="bottomSO" class="chart"></div></section>
 <section class="panel"><h2>Top 10 Branch Offices by Amount Paid</h2><div id="topBO" class="chart"></div></section>
 <section class="panel"><h2>Bottom 10 Branch Offices by Amount Paid</h2><div id="bottomBO" class="chart"></div></section>
 <section class="panel wide"><h2>Policies indexed by Sub Division</h2><div id="subdivisionChart" class="chart"></div></section>
@@ -80,12 +84,63 @@ let daily=group(rows,'CHECKIN_DATE').sort((a,b)=>a.name.localeCompare(b.name));p
 let sos=group(rows,'SO_NAME'),bos=group(rows,'BO_NAME');barRank('topSO',sos.slice().sort((a,b)=>b.amount-a.amount).slice(0,10));barRank('bottomSO',sos.slice().sort((a,b)=>a.amount-b.amount).slice(0,10).sort((a,b)=>b.amount-a.amount));barRank('topBO',bos.slice().sort((a,b)=>b.amount-a.amount).slice(0,10));barRank('bottomBO',bos.slice().sort((a,b)=>a.amount-b.amount).slice(0,10).sort((a,b)=>b.amount-a.amount));
 let subExists=rows.some(r=>r.SUB_DIVISION);$('subdivisionWarning').classList.toggle('hidden',subExists);let subs=subExists?group(rows,'SUB_DIVISION').sort((a,b)=>b.policies-a.policies):[];
 if(subExists){plot('subdivisionChart',[{type:'bar',orientation:'h',y:subs.map(x=>x.name).reverse(),x:subs.map(x=>x.policies).reverse(),marker:{color:'#29836f'},hovertemplate:'%{y}<br>Policies: %{x}<extra></extra>'},{type:'scatter',mode:'markers',x:subs.map(x=>x.amount).reverse(),y:subs.map(x=>x.name).reverse(),xaxis:'x2',marker:{color:'#e39a36',size:9},name:'Amount paid'}],{margin:{l:150,r:70,t:15,b:45},xaxis:{title:'Number of policies'},xaxis2:{title:'Amount paid (₹)',overlaying:'x',side:'top',showgrid:false},yaxis:{automargin:true}})}else{plot('subdivisionChart',[],{annotations:[{text:'Add a SUB_DIVISION column to enable this chart',xref:'paper',yref:'paper',x:.5,y:.5,showarrow:false,font:{size:15,color:'#657789'}}],xaxis:{visible:false},yaxis:{visible:false}})}
-table('divisionTable',divs,[{key:'name',label:'Division'},{key:'policies',label:'Policies',format:count},{key:'pli',label:'PLI',format:count},{key:'rpli',label:'RPLI',format:count},{key:'amount',label:'Total Amount Paid',format:money},{key:'pliAmount',label:'PLI Amount',format:money},{key:'rpliAmount',label:'RPLI Amount',format:money}]);
+const allDates=normalize(rawData).map(r=>r.CHECKIN_DATE).filter(Boolean).sort();
+const lastDate=allDates.length?allDates[allDates.length-1]:'';
+const dateLabel=lastDate?new Date(lastDate+'T12:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'}):'date unavailable';
+$('tickerText').textContent='DATA IS AVAILABLE ONLY UP TO '+dateLabel.toUpperCase()+'  •  DATA IS AVAILABLE ONLY UP TO '+dateLabel.toUpperCase()+'  •  ';
+const topOffice=[...sos].sort((a,b)=>b.amount-a.amount)[0];
+const bottomOffice=[...sos].sort((a,b)=>a.amount-b.amount)[0];
+const topDivision=[...divs].sort((a,b)=>b.amount-a.amount)[0];
+const pliTotal=pli.reduce((s,r)=>s+r.AMOUNT_PAID,0),rpliTotal=rpli.reduce((s,r)=>s+r.AMOUNT_PAID,0);
+let comments=[];
+if(rows.length){
+ comments.push('The selected filters show '+count(rows.length)+' indexed policies with total amount paid of '+money(amount)+'.');
+ if(topDivision)comments.push('Leading Division by amount paid: '+topDivision.name+' ('+money(topDivision.amount)+').');
+ if(topOffice)comments.push('Leading Sub Office grouping by amount paid: '+topOffice.name+' ('+money(topOffice.amount)+').');
+ if(bottomOffice&&sos.length>1)comments.push('Lowest Sub Office grouping by amount paid among the offices in this view: '+bottomOffice.name+' ('+money(bottomOffice.amount)+'). Interpret this alongside the number of working days and local opportunity.');
+ comments.push('Product mix by amount paid: PLI '+money(pliTotal)+'; RPLI '+money(rpliTotal)+'.');
+}else comments.push('No records match the selected filters. Try widening the date range or clearing an office filter.');
+$('insightText').innerHTML='<ul>'+comments.map(c=>'<li>'+esc(c)+'</li>').join('')+'</ul>';
+table('divisionTable',[{name:'Division summary',policies:rows.length,pli:pli.length,rpli:rpli.length,amount:amount,pliAmount:pliTotal,rpliAmount:rpliTotal},...divs],[{key:'name',label:'Division'},{key:'policies',label:'Policies',format:count},{key:'pli',label:'PLI',format:count},{key:'rpli',label:'RPLI',format:count},{key:'amount',label:'Total Amount Paid',format:money},{key:'pliAmount',label:'PLI Amount',format:money},{key:'rpliAmount',label:'RPLI Amount',format:money}]);
+/* division table above includes circle total row */
+
 table('subdivisionTable',subs,[{key:'name',label:'Sub Division'},{key:'policies',label:'Policies',format:count},{key:'pli',label:'PLI',format:count},{key:'rpli',label:'RPLI',format:count},{key:'amount',label:'Total Amount Paid',format:money}]);
 }
-function refresh(){fillDivisions();render()}
-$('apply').onclick=render;$('reset').onclick=()=>{$('division').value='';$('product').value='';$('from').value='';$('to').value='';$('search').value='';render()};
-$('loadSheet').onclick=async()=>{let url=$('sheetUrl').value.trim();if(!url){alert('Paste the published Google Sheets CSV URL first.');return}try{$('status').textContent='Loading sheet…';let response=await fetch(url);if(!response.ok)throw new Error('HTTP '+response.status);let text=await response.text();if(text.trim().startsWith('<'))throw new Error('The URL returned a web page, not CSV. Publish the sheet tab as CSV.');Papa.parse(text,{header:true,skipEmptyLines:true,complete:r=>{if(!r.data.length){alert('No CSV rows found.');return}rawData=r.data;refresh();$('status').textContent='Loaded Google Sheet';},error:e=>alert(e.message)})}catch(e){alert('Could not load the sheet. Check that it is published as CSV and publicly viewable. Details: '+e.message);$('status').textContent='Load failed'}};
-$('csvFile').onchange=e=>{let f=e.target.files[0];if(!f)return;Papa.parse(f,{header:true,skipEmptyLines:true,complete:r=>{rawData=r.data;refresh();$('status').textContent='Loaded '+f.name}})};
-rawData=INITIAL_DATA;const dates=normalize(rawData).map(r=>r.CHECKIN_DATE).filter(Boolean).sort();if(dates.length){$('from').value=dates[0];$('to').value=dates[dates.length-1]}refresh();
+function fillOffices(){
+  const sel=$('search'),old=sel.value;
+  const names=[...new Set(normalize(rawData).flatMap(r=>[r.SO_NAME,r.BO_NAME,r.HO_NAME]).filter(v=>v&&v!=='Unknown SO'&&v!=='Unknown BO'))].sort();
+  sel.innerHTML='<option value="">All Offices</option>'+names.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
+  sel.value=names.includes(old)?old:'';
+}
+function refresh(){fillDivisions();fillOffices();render()}
+['division','product','from','to','search'].forEach(id=>$(id).addEventListener('change',render));
+const DEFAULT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSXjRjllcFxcj3cbrd5-SncFeZIwbUM6IDnOEz3xQwQMiZewicN1K42xdc_FodwfKZZEmMfHNbluN4L/pub?gid=0&single=true&output=csv';
+function setDateRangeFromData(){
+  const dates=normalize(rawData).map(r=>r.CHECKIN_DATE).filter(Boolean).sort();
+  if(dates.length){$('from').value=dates[0];$('to').value=dates[dates.length-1]}
+}
+async function loadGoogleSheet(url, showAlerts=true){
+  if(!url){if(showAlerts)alert('Paste the published Google Sheets CSV URL first.');return}
+  try{
+    $('status').textContent='Loading Google Sheet…';
+    const response=await fetch(url,{cache:'no-store'});
+    if(!response.ok)throw new Error('HTTP '+response.status);
+    const csvText=await response.text();
+    if(csvText.trim().startsWith('<'))throw new Error('The URL returned a web page, not CSV. Publish the worksheet as CSV.');
+    Papa.parse(csvText,{header:true,skipEmptyLines:true,complete:r=>{
+      if(!r.data.length){$('status').textContent='No rows found';if(showAlerts)alert('No CSV rows found.');return}
+      rawData=r.data;
+      setDateRangeFromData();
+      refresh();
+      $('status').textContent='Live Google Sheet loaded';
+    },error:e=>{ $('status').textContent='CSV parse failed'; if(showAlerts)alert(e.message); }});
+  }catch(e){
+    $('status').textContent='Google Sheet load failed; showing saved sample data';
+    if(showAlerts)alert('Could not load the sheet. Check that it is published as CSV and publicly viewable. Details: '+e.message);
+  }
+}
+rawData=INITIAL_DATA;
+setDateRangeFromData();
+refresh();
+loadGoogleSheet(DEFAULT_SHEET_URL,false);
 </script></body></html>
