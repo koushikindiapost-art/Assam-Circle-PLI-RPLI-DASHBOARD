@@ -5,6 +5,7 @@
 <title>Assam Circle | PLI-RPLI New Indexing Dashboard</title>
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
 :root{--navy:#12304a;--blue:#1769aa;--bg:#f3f6fa;--ink:#172b3a;--muted:#657789;--line:#dce4ec;--white:#fff}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);font:14px/1.45 Arial,Helvetica,sans-serif;color:var(--ink)}
@@ -24,13 +25,13 @@ select,input,button{font:inherit;border:1px solid #cbd6e1;border-radius:7px;padd
 button{background:var(--blue);color:white;border-color:var(--blue);font-weight:700;cursor:pointer}button.secondary{background:white;color:var(--blue)}
 .note{color:var(--muted);font-size:12px;flex-basis:100%}.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
 .kpi{padding:16px}.kpi .name{color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}.kpi .value{font-size:clamp(20px,2.5vw,30px);font-weight:800;margin-top:5px;color:var(--navy)}.kpi .sub{font-size:12px;color:var(--muted);margin-top:4px}
-.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.panel{padding:15px;min-width:0}.panel h2{font-size:16px;margin:0 0 8px;color:var(--navy)}.wide{grid-column:1/-1}.chart{width:100%;height:350px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.panel{padding:15px;min-width:0}.panel h2{font-size:16px;margin:0 0 8px;color:var(--navy)}.panel-title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px}.panel-title-row h2{flex:1;margin:0}.pdf-btn{font-size:11px;padding:6px 9px;white-space:nowrap;flex-shrink:0}.pdf-export-clone{background:#fff;color:#172b3a;padding:18px;width:100%;font-family:Arial,sans-serif}.pdf-export-clone h2{color:#12304a;margin:0 0 12px}.pdf-export-clone .tablewrap{max-height:none;overflow:visible}.pdf-export-clone table{white-space:normal;width:100%;font-size:10px}.pdf-export-clone th,.pdf-export-clone td{position:static;padding:5px;border:1px solid #dce4ec}.pdf-export-clone .chart{height:360px}.wide{grid-column:1/-1}.chart{width:100%;height:350px}
 .tablewrap{overflow:auto;max-height:440px;border:1px solid var(--line);border-radius:8px}table{border-collapse:collapse;width:100%;font-size:12px;white-space:nowrap}th,td{padding:9px 10px;text-align:right;border-bottom:1px solid #e8edf2}th{background:#edf3f8;position:sticky;top:0;z-index:1;color:#29465d}td:first-child,th:first-child{text-align:left}tbody tr:hover{background:#f6faff}
 .status{font-size:12px;margin-left:auto;color:#e9f6ff}.warn{background:#fff7e5;border:1px solid #f0d79b;border-radius:8px;padding:10px 12px;margin-bottom:14px;color:#76520b}.hidden{display:none}
 @media(max-width:850px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.grid{grid-template-columns:1fr}.wide{grid-column:auto}.chart{height:310px}}@media(max-width:480px){.kpis{grid-template-columns:1fr 1fr}.kpi{padding:11px}.toolbar .field{min-width:42%}}
 </style></head><body>
 <header><h1>Assam Circle | PLI-RPLI New Indexing</h1><p>Performance dashboard • Ranking is based on total Amount Paid • Filter by date, division and product</p></header>
-<div class="ticker" aria-label="Latest data date"><span id="tickerText">DATA IS AVAILABLE UP TO THE LATEST DATE IN THE SOURCE DATA</span></div>
+<div class="ticker" aria-label="Latest data date"><span id="tickerText">Data is updated only for the Previous Working Day</span></div>
 <main>
 <div class="toolbar">
 <div class="field"><label>Division</label><select id="division"><option value="">All Divisions</option></select></div>
@@ -51,7 +52,7 @@ button{background:var(--blue);color:white;border-color:var(--blue);font-weight:7
 <section class="insight" id="performanceInsights"><h2>Performance Comments</h2><div id="insightText">Performance observations will appear here after data loads.</div></section>
 <div class="grid">
 <section class="panel"><h2>Division performance: PLI vs RPLI</h2><div id="divisionChart" class="chart"></div></section>
-<section class="panel"><h2>Day-wise indexing trend</h2><div id="dailyChart" class="chart"></div></section>
+<section class="panel"><h2 id="dailyTrendTitle">Current Month Day-wise Indexing Trend</h2><div id="dailyChart" class="chart"></div></section>
 <section class="panel"><h2>Top 10 Performing Offices</h2><div id="topSO" class="chart"></div></section>
 <section class="panel"><h2>Bottom 10 Performing Offices</h2><div id="bottomSO" class="chart"></div></section>
 <section class="panel"><h2>Top 10 Branch Offices by Amount Paid</h2><div id="topBO" class="chart"></div></section>
@@ -59,6 +60,8 @@ button{background:var(--blue);color:white;border-color:var(--blue);font-weight:7
 <section class="panel wide"><h2>Policies indexed by Sub Division</h2><div id="subdivisionChart" class="chart"></div></section>
 <section class="panel wide"><h2>Division summary</h2><div id="divisionTable" class="tablewrap"></div></section>
 <section class="panel wide"><h2>Sub Division summary</h2><div id="subdivisionTable" class="tablewrap"></div></section>
+<section class="panel wide"><h2>Top 10 Highest Amount Paid Policies</h2><div id="topPoliciesTable" class="tablewrap"></div></section>
+<section class="panel wide"><h2>Top 10 Lowest Amount Paid Policies</h2><div id="bottomPoliciesTable" class="tablewrap"></div></section>
 </div>
 </main>
 <script>
@@ -68,7 +71,36 @@ const $=id=>document.getElementById(id);
 const num=v=>{const n=Number(v);return Number.isFinite(n)?n:0};
 const money=v=>'₹'+Math.round(v).toLocaleString('en-IN');
 const count=v=>Math.round(v).toLocaleString('en-IN');
-function parseDate(v){if(!v)return null;let d=new Date(v);if(!isNaN(d))return d;return null}
+function parseDate(v){
+  if(v===null||v===undefined||String(v).trim()==='')return null;
+  const s=String(v).trim();
+  // Google Sheets may export dates as Excel/Sheets serial numbers. Convert serial day
+  // values using the spreadsheet epoch, avoiding a UTC/local-time shift.
+  if(/^\d{5}(?:\.\d+)?$/.test(s)){
+    const serial=Number(s);
+    if(serial>=30000&&serial<=60000){
+      const d=new Date(Date.UTC(1899,11,30)+Math.floor(serial)*86400000);
+      return isNaN(d)?null:d;
+    }
+  }
+  // Preserve ISO calendar dates exactly instead of parsing through local time.
+  const iso=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(iso){
+    const d=new Date(Date.UTC(Number(iso[1]),Number(iso[2])-1,Number(iso[3])));
+    return isNaN(d)?null:d;
+  }
+  // Explicitly parse common spreadsheet strings such as 19-Oct-26 or 19/10/2026.
+  let m=s.match(/^(\d{1,2})[-\s/]([A-Za-z]{3,9})[-\s/](\d{2,4})$/);
+  if(m){
+    const months={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+    const month=months[m[2].slice(0,3).toLowerCase()];
+    let year=Number(m[3]);if(year<100)year+=year>=70?1900:2000;
+    if(month!==undefined)return new Date(Date.UTC(year,month,Number(m[1])));
+  }
+  m=s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if(m)return new Date(Date.UTC(Number(m[3]),Number(m[2])-1,Number(m[1])));
+  const d=new Date(s);return isNaN(d)?null:d;
+}
 function normalize(rows){return rows.map(r=>{let d=parseDate(r.CHECKIN_D);return {...r, CARRIER_CODE:String(r.CARRIER_CODE||'').trim().toUpperCase(),DO_NAME:String(r.DO_NAME||'Unknown Division').trim(),SO_NAME:String(r.SO_NAME||r.HO_NAME||'Unknown SO').trim(),BO_NAME:String(r.BO_NAME||r.SO_NAME||r.HO_NAME||'Unknown BO').trim(),SUB_DIVISION:String(r.SUB_DIVISION||'').trim(),AMOUNT_PAID:num(r.AMOUNT_PAID),CHECKIN_DATE:d?d.toISOString().slice(0,10):''}}).filter(r=>r.CHECKIN_DATE)}
 function fillDivisions(){let sel=$('division'),old=sel.value;let vals=[...new Set(rawData.map(r=>r.DO_NAME).filter(Boolean))].sort();sel.innerHTML='<option value="">All Divisions</option>'+vals.map(v=>`<option>${esc(v)}</option>`).join('');sel.value=vals.includes(old)?old:''}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -80,14 +112,24 @@ function table(id,rows,headers){$(id).innerHTML='<table><thead><tr>'+headers.map
 function render(){let rows=filtered(),pli=rows.filter(r=>r.CARRIER_CODE==='PLI'),rpli=rows.filter(r=>r.CARRIER_CODE==='RPL'),amount=rows.reduce((s,r)=>s+r.AMOUNT_PAID,0);
 $('kPolicies').textContent=count(rows.length);$('kAmount').textContent=money(amount);$('kPli').textContent=count(pli.length);$('kPliAmt').textContent='Amount paid: '+money(pli.reduce((s,r)=>s+r.AMOUNT_PAID,0));$('kRpli').textContent=count(rpli.length);$('kRpliAmt').textContent='Amount paid: '+money(rpli.reduce((s,r)=>s+r.AMOUNT_PAID,0));$('status').textContent=count(rows.length)+' records';
 let divs=group(rows,'DO_NAME').sort((a,b)=>b.amount-a.amount);plot('divisionChart',[{type:'bar',name:'PLI',x:divs.map(x=>x.name),y:divs.map(x=>x.pliAmount),marker:{color:'#1769aa'}},{type:'bar',name:'RPLI',x:divs.map(x=>x.name),y:divs.map(x=>x.rpliAmount),marker:{color:'#e39a36'}}],{barmode:'group',margin:{l:65,r:10,t:15,b:105},xaxis:{tickangle:-35,automargin:true},yaxis:{title:'Amount paid (₹)',tickformat:'~s'}});
-let daily=group(rows,'CHECKIN_DATE').sort((a,b)=>a.name.localeCompare(b.name));plot('dailyChart',[{type:'scatter',mode:'lines+markers',name:'Policies',x:daily.map(x=>x.name),y:daily.map(x=>x.policies),line:{color:'#1769aa',width:3}},{type:'bar',name:'Amount paid',x:daily.map(x=>x.name),y:daily.map(x=>x.amount),yaxis:'y2',opacity:.3,marker:{color:'#e39a36'}}],{margin:{l:55,r:65,t:15,b:55},xaxis:{title:'Indexing date'},yaxis:{title:'Policy count'},yaxis2:{title:'Amount paid (₹)',overlaying:'y',side:'right',showgrid:false,tickformat:'~s'}});
+// The date-wise trend is always restricted to the current calendar month.
+// Division, product and office filters are respected; the general From/To range does not change this chart.
+const now=new Date(), monthStart=new Date(now.getFullYear(),now.getMonth(),1), nextMonth=new Date(now.getFullYear(),now.getMonth()+1,1);
+const monthStartKey=monthStart.getFullYear()+'-'+String(monthStart.getMonth()+1).padStart(2,'0')+'-01';
+const monthName=now.toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+$('dailyTrendTitle').textContent='Current Month Day-wise Indexing Trend ('+monthName+')';
+const divFilter=$('division').value,prodFilter=$('product').value,officeFilter=$('search').value.trim();
+const monthRows=normalize(rawData).filter(r=>r.CHECKIN_DATE>=monthStartKey&&r.CHECKIN_DATE<nextMonth.toISOString().slice(0,10)&&(!divFilter||r.DO_NAME===divFilter)&&(!prodFilter||r.CARRIER_CODE===prodFilter)&&(!officeFilter||r.SO_NAME===officeFilter||r.BO_NAME===officeFilter||r.HO_NAME===officeFilter));
+const groupedDaily=new Map(group(monthRows,'CHECKIN_DATE').map(x=>[x.name,x]));
+const monthLastData=monthRows.map(r=>r.CHECKIN_DATE).sort().pop();
+const lastDay=monthLastData?Number(monthLastData.slice(8,10)):now.getDate();
+const daily=[];for(let day=1;day<=lastDay;day++){const key=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(day).padStart(2,'0');daily.push(groupedDaily.get(key)||{name:key,policies:0,amount:0})}
+plot('dailyChart',[{type:'scatter',mode:'lines+markers',name:'Policies',x:daily.map(x=>x.name),y:daily.map(x=>x.policies),line:{color:'#1769aa',width:3},hovertemplate:'%{x}<br>Policies: %{y}<extra></extra>'},{type:'bar',name:'Amount paid',x:daily.map(x=>x.name),y:daily.map(x=>x.amount),yaxis:'y2',opacity:.3,marker:{color:'#e39a36'},hovertemplate:'%{x}<br>Amount paid: ₹%{y:,.0f}<extra></extra>'}],{margin:{l:55,r:65,t:15,b:55},xaxis:{title:'Indexing date',type:'category'},yaxis:{title:'Policy count',rangemode:'tozero'},yaxis2:{title:'Amount paid (₹)',overlaying:'y',side:'right',showgrid:false,tickformat:'~s',rangemode:'tozero'}});
 let sos=group(rows,'SO_NAME'),bos=group(rows,'BO_NAME');barRank('topSO',sos.slice().sort((a,b)=>b.amount-a.amount).slice(0,10));barRank('bottomSO',sos.slice().sort((a,b)=>a.amount-b.amount).slice(0,10).sort((a,b)=>b.amount-a.amount));barRank('topBO',bos.slice().sort((a,b)=>b.amount-a.amount).slice(0,10));barRank('bottomBO',bos.slice().sort((a,b)=>a.amount-b.amount).slice(0,10).sort((a,b)=>b.amount-a.amount));
 let subExists=rows.some(r=>r.SUB_DIVISION);$('subdivisionWarning').classList.toggle('hidden',subExists);let subs=subExists?group(rows,'SUB_DIVISION').sort((a,b)=>b.policies-a.policies):[];
 if(subExists){plot('subdivisionChart',[{type:'bar',orientation:'h',y:subs.map(x=>x.name).reverse(),x:subs.map(x=>x.policies).reverse(),marker:{color:'#29836f'},hovertemplate:'%{y}<br>Policies: %{x}<extra></extra>'},{type:'scatter',mode:'markers',x:subs.map(x=>x.amount).reverse(),y:subs.map(x=>x.name).reverse(),xaxis:'x2',marker:{color:'#e39a36',size:9},name:'Amount paid'}],{margin:{l:150,r:70,t:15,b:45},xaxis:{title:'Number of policies'},xaxis2:{title:'Amount paid (₹)',overlaying:'x',side:'top',showgrid:false},yaxis:{automargin:true}})}else{plot('subdivisionChart',[],{annotations:[{text:'Add a SUB_DIVISION column to enable this chart',xref:'paper',yref:'paper',x:.5,y:.5,showarrow:false,font:{size:15,color:'#657789'}}],xaxis:{visible:false},yaxis:{visible:false}})}
-const allDates=normalize(rawData).map(r=>r.CHECKIN_DATE).filter(Boolean).sort();
-const lastDate=allDates.length?allDates[allDates.length-1]:'';
-const dateLabel=lastDate?new Date(lastDate+'T12:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'}):'date unavailable';
-$('tickerText').textContent='DATA IS AVAILABLE ONLY UP TO '+dateLabel.toUpperCase()+'  •  DATA IS AVAILABLE ONLY UP TO '+dateLabel.toUpperCase()+'  •  ';
+// Keep the running ticker message as requested.
+$('tickerText').textContent='Data is updated only for the Previous Working Day  •  Data is updated only for the Previous Working Day  •  ';
 const topOffice=[...sos].sort((a,b)=>b.amount-a.amount)[0];
 const bottomOffice=[...sos].sort((a,b)=>a.amount-b.amount)[0];
 const topDivision=[...divs].sort((a,b)=>b.amount-a.amount)[0];
@@ -105,6 +147,20 @@ table('divisionTable',[{name:'Division summary',policies:rows.length,pli:pli.len
 /* division table above includes circle total row */
 
 table('subdivisionTable',subs,[{key:'name',label:'Sub Division'},{key:'policies',label:'Policies',format:count},{key:'pli',label:'PLI',format:count},{key:'rpli',label:'RPLI',format:count},{key:'amount',label:'Total Amount Paid',format:money}]);
+const policyHeaders=[
+ {key:'PROPOSAL',label:'Policy / Proposal No.'},
+ {key:'CARRIER_CODE',label:'Product',format:v=>v==='RPL'?'RPLI':v},
+ {key:'DO_NAME',label:'Division'},
+ {key:'HO_NAME',label:'HO'},
+ {key:'SO_NAME',label:'SO'},
+ {key:'BO_NAME',label:'BO'},
+ {key:'CHECKIN_DATE',label:'Indexing Date'},
+ {key:'SUM_ASSD',label:'Sum Assured',format:v=>money(num(v))},
+ {key:'AMOUNT_PAID',label:'Amount Paid',format:money}
+];
+const policyRows=rows.slice().sort((a,b)=>b.AMOUNT_PAID-a.AMOUNT_PAID);
+table('topPoliciesTable',policyRows.slice(0,10),policyHeaders);
+table('bottomPoliciesTable',policyRows.slice(-10).reverse(),policyHeaders);
 }
 function fillOffices(){
   const sel=$('search'),old=sel.value;
@@ -139,8 +195,35 @@ async function loadGoogleSheet(url, showAlerts=true){
     if(showAlerts)alert('Could not load the sheet. Check that it is published as CSV and publicly viewable. Details: '+e.message);
   }
 }
+function setupSectionPdfExports(){
+  document.querySelectorAll('.panel').forEach(panel=>{
+    if(panel.querySelector('.pdf-btn'))return;
+    const title=panel.querySelector('h2');if(!title)return;
+    const heading=document.createElement('div');heading.className='panel-title-row';
+    panel.insertBefore(heading,title);heading.appendChild(title);
+    const btn=document.createElement('button');btn.type='button';btn.className='pdf-btn';btn.textContent='Download PDF';
+    btn.title='Download this section as a PDF';
+    btn.addEventListener('click',async()=>{
+      if(typeof html2pdf==='undefined'){alert('PDF library did not load. Please check your internet connection and try again.');return}
+      const clone=panel.cloneNode(true);clone.classList.add('pdf-export-clone');
+      clone.style.width='1100px';clone.style.maxWidth='none';clone.style.boxShadow='none';clone.style.border='0';clone.style.borderRadius='0';
+      clone.querySelectorAll('.pdf-btn').forEach(el=>el.remove());
+      clone.querySelectorAll('.tablewrap').forEach(el=>{el.style.maxHeight='none';el.style.overflow='visible';});
+      clone.querySelectorAll('th').forEach(el=>{el.style.position='static';});
+      clone.querySelectorAll('.chart').forEach(el=>{el.style.height='360px';el.style.width='100%';});
+      const wrap=document.createElement('div');wrap.style.position='fixed';wrap.style.left='-12000px';wrap.style.top='0';wrap.style.width='1100px';wrap.style.background='#fff';wrap.appendChild(clone);document.body.appendChild(wrap);
+      const base=(title.textContent||'dashboard-section').trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+      btn.disabled=true;btn.textContent='Preparing PDF…';
+      try{await html2pdf().set({margin:8,filename:'assam-pli-rpli-'+(base||'section')+'.pdf',image:{type:'jpeg',quality:0.96},html2canvas:{scale:1.5,useCORS:true,backgroundColor:'#ffffff',scrollX:0,scrollY:0},jsPDF:{unit:'mm',format:'a4',orientation:'landscape'},pagebreak:{mode:['css','legacy']}}).from(clone).save();}
+      catch(err){alert('Could not create the PDF. Please try again.');}
+      finally{wrap.remove();btn.disabled=false;btn.textContent='Download PDF';}
+    });
+    heading.appendChild(btn);
+  });
+}
 rawData=INITIAL_DATA;
 setDateRangeFromData();
 refresh();
+setupSectionPdfExports();
 loadGoogleSheet(DEFAULT_SHEET_URL,false);
 </script></body></html>
