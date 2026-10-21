@@ -42,7 +42,7 @@ button{background:var(--blue);color:white;border-color:var(--blue);font-weight:7
 <div class="status" id="status">Loading data…</div>
 <div class="note">Filters update the dashboard automatically. Data is loaded from the configured Google Sheets source.</div>
 </div>
-<div id="subdivisionWarning" class="warn hidden"><b>Subdivision-wise policy count:</b> the uploaded CSV has no SUB_DIVISION column. Add a column named <b>SUB_DIVISION</b> in Google Sheets and fill it for each row to enable the Sub Division-wise performance chart and ranking table. Rankings are based on Total Amount Paid. Other dashboard sections work without it.</div>
+<div id="subdivisionWarning" class="warn hidden"><b>Sub Division data unavailable:</b> check that the published CSV includes a populated SUB_DIVISION column. Rankings are based on Total Amount Paid.</div>
 <div class="kpis">
 <div class="kpi"><div class="name">Policies indexed</div><div class="value" id="kPolicies">–</div><div class="sub">Count of proposal records</div></div>
 <div class="kpi"><div class="name">Total amount paid</div><div class="value" id="kAmount">–</div><div class="sub">Sum of AMOUNT_PAID</div></div>
@@ -185,10 +185,30 @@ async function loadGoogleSheet(url, showAlerts=true){
     if(csvText.trim().startsWith('<'))throw new Error('The URL returned a web page, not CSV. Publish the worksheet as CSV.');
     Papa.parse(csvText,{header:true,skipEmptyLines:true,complete:r=>{
       if(!r.data.length){$('status').textContent='No rows found';if(showAlerts)alert('No CSV rows found.');return}
-      rawData=r.data;
+      // Normalize the SUB_DIVISION header so variations such as "Sub Division",
+      // "SUB-DIVISION", spaces, or a UTF-8 BOM are recognized.
+      const fields = (r.meta && r.meta.fields) ? r.meta.fields : Object.keys(r.data[0] || {});
+      const cleanHeader = value => String(value || '').replace(/^\\uFEFF/, '').trim().toUpperCase().replace(/[\\s-]+/g, '_');
+      const subField = fields.find(field => ['SUB_DIVISION','SUBDIVISION','SUB_DIVISION_NAME'].includes(cleanHeader(field)));
+      rawData = r.data.map(row => {
+        const cleaned = {...row};
+        if (subField) cleaned.SUB_DIVISION = String(row[subField] ?? '').replace(/^\\uFEFF/, '').trim();
+        return cleaned;
+      });
       setDateRangeFromData();
       refresh();
-      $('status').textContent='Live Google Sheet loaded';
+      const assignedSubDivisions = rawData.filter(row => String(row.SUB_DIVISION || '').trim()).length;
+      if (!subField) {
+        $('status').textContent = 'Live sheet loaded, but SUB_DIVISION header was not found in the published CSV';
+        $('subdivisionWarning').innerHTML = '<b>Sub Division data unavailable:</b> the published CSV does not contain a recognized SUB_DIVISION header. Confirm the column is in the published worksheet (gid=0) and republish/update the CSV.';
+        $('subdivisionWarning').classList.remove('hidden');
+      } else if (!assignedSubDivisions) {
+        $('status').textContent = 'Live sheet loaded, but SUB_DIVISION values are blank';
+        $('subdivisionWarning').innerHTML = '<b>Sub Division data unavailable:</b> the SUB_DIVISION column was found, but all values are blank in the published CSV. Fill the column for each record and republish/update the CSV.';
+        $('subdivisionWarning').classList.remove('hidden');
+      } else {
+        $('status').textContent = 'Live Google Sheet loaded • Sub Division assigned for ' + assignedSubDivisions.toLocaleString('en-IN') + ' of ' + rawData.length.toLocaleString('en-IN') + ' rows';
+      }
     },error:e=>{ $('status').textContent='CSV parse failed'; if(showAlerts)alert(e.message); }});
   }catch(e){
     $('status').textContent='Google Sheet load failed; showing saved sample data';
