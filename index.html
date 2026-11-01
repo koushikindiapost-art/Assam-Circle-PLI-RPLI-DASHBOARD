@@ -27,7 +27,7 @@ button{background:var(--blue);color:white;border-color:var(--blue);font-weight:7
 .kpi{padding:16px}.kpi .name{color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}.kpi .value{font-size:clamp(20px,2.5vw,30px);font-weight:800;margin-top:5px;color:var(--navy)}.kpi .sub{font-size:12px;color:var(--muted);margin-top:4px}
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.panel{padding:15px;min-width:0}.panel h2{font-size:16px;margin:0 0 8px;color:var(--navy)}.panel-title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px}.panel-title-row h2{flex:1;margin:0}.pdf-btn{font-size:11px;padding:6px 9px;white-space:nowrap;flex-shrink:0}.pdf-export-clone{background:#fff;color:#172b3a;padding:18px;width:100%;font-family:Arial,sans-serif}.pdf-export-clone h2{color:#12304a;margin:0 0 12px}.pdf-export-clone .tablewrap{max-height:none;overflow:visible}.pdf-export-clone table{white-space:normal;width:100%;font-size:10px}.pdf-export-clone th,.pdf-export-clone td{position:static;padding:5px;border:1px solid #dce4ec}.pdf-export-clone .chart{height:360px}.wide{grid-column:1/-1}.chart{width:100%;height:350px}
 .tablewrap{overflow:auto;max-height:440px;border:1px solid var(--line);border-radius:8px}table{border-collapse:collapse;width:100%;font-size:12px;white-space:nowrap}th,td{padding:9px 10px;text-align:right;border-bottom:1px solid #e8edf2}th{background:#edf3f8;position:sticky;top:0;z-index:1;color:#29465d}td:first-child,th:first-child{text-align:left}tbody tr:hover{background:#f6faff}
-.status{font-size:12px;margin-left:auto;color:#e9f6ff}.warn{background:#fff7e5;border:1px solid #f0d79b;border-radius:8px;padding:10px 12px;margin-bottom:14px;color:#76520b}.hidden{display:none}
+.status{font-size:12px;margin-left:auto;color:var(--muted);font-weight:700;max-width:100%;text-align:right}.warn{background:#fff7e5;border:1px solid #f0d79b;border-radius:8px;padding:10px 12px;margin-bottom:14px;color:#76520b}.hidden{display:none}
 @media(max-width:850px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.grid{grid-template-columns:1fr}.wide{grid-column:auto}.chart{height:310px}}@media(max-width:480px){.kpis{grid-template-columns:1fr 1fr}.kpi{padding:11px}.toolbar .field{min-width:42%}}
 </style></head><body>
 <header><h1>Assam Circle | PLI-RPLI New Indexing</h1><p>Performance dashboard • Ranking is based on total Amount Paid • Filter by date, division and product</p></header>
@@ -97,11 +97,29 @@ function parseDate(v){
     let year=Number(m[3]);if(year<100)year+=year>=70?1900:2000;
     if(month!==undefined)return new Date(Date.UTC(year,month,Number(m[1])));
   }
+  // Explicitly parse DD/MM/YY used by the published Assam Circle sheet.
+  m=s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2})$/);
+  if(m){
+    const day=Number(m[1]), month=Number(m[2])-1, year=2000+Number(m[3]);
+    const d=new Date(Date.UTC(year,month,day));
+    if(d.getUTCFullYear()===year && d.getUTCMonth()===month && d.getUTCDate()===day)return d;
+    return null;
+  }
   m=s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
-  if(m)return new Date(Date.UTC(Number(m[3]),Number(m[2])-1,Number(m[1])));
+  if(m){
+    const day=Number(m[1]), month=Number(m[2])-1, year=Number(m[3]);
+    const d=new Date(Date.UTC(year,month,day));
+    if(d.getUTCFullYear()===year && d.getUTCMonth()===month && d.getUTCDate()===day)return d;
+    return null;
+  }
   const d=new Date(s);return isNaN(d)?null:d;
 }
-function normalize(rows){return rows.map(r=>{let d=parseDate(r.CHECKIN_D);return {...r, CARRIER_CODE:String(r.CARRIER_CODE||'').trim().toUpperCase(),DO_NAME:String(r.DO_NAME||'Unknown Division').trim(),SO_NAME:String(r.SO_NAME||r.HO_NAME||'Unknown SO').trim(),BO_NAME:String(r.BO_NAME||'').trim(),SUB_DIVISION:String(r.SUB_DIVISION||'').trim(),AMOUNT_PAID:num(r.AMOUNT_PAID),CHECKIN_DATE:d?d.toISOString().slice(0,10):''}}).filter(r=>r.CHECKIN_DATE)}
+function normalize(rows){return rows.map(r=>{
+  // Historical repository rows use CHECKIN_D; newly indexed sheet rows use CHECKIN_DATE.
+  const rawDate=r.CHECKIN_D||r.CHECKIN_DATE||r.checkin_d||r.checkin_date||'';
+  let d=parseDate(rawDate);
+  return {...r, CARRIER_CODE:String(r.CARRIER_CODE||r.carrier_code||'').trim().toUpperCase(),DO_NAME:String(r.DO_NAME||r.do_name||'Unknown Division').trim(),SO_NAME:String(r.SO_NAME||r.so_name||r.HO_NAME||r.ho_name||'Unknown SO').trim(),BO_NAME:String(r.BO_NAME||r.bo_name||'').trim(),SUB_DIVISION:String(r.SUB_DIVISION||r.sub_division||'').trim(),AMOUNT_PAID:num(r.AMOUNT_PAID??r.amount_paid),CHECKIN_DATE:d?d.toISOString().slice(0,10):''};
+}).filter(r=>r.CHECKIN_DATE)}
 function fillDivisions(){let sel=$('division'),old=sel.value;let vals=[...new Set(rawData.map(r=>r.DO_NAME).filter(Boolean))].sort();sel.innerHTML='<option value="">All Divisions</option>'+vals.map(v=>`<option>${esc(v)}</option>`).join('');sel.value=vals.includes(old)?old:''}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function filtered(){let a=normalize(rawData),div=$('division').value,prod=$('product').value,from=$('from').value,to=$('to').value,search=$('search').value.trim().toLowerCase();return a.filter(r=>(!div||r.DO_NAME===div)&&(!prod||r.CARRIER_CODE===prod)&&(!from||r.CHECKIN_DATE>=from)&&(!to||r.CHECKIN_DATE<=to)&&(!search||r.SO_NAME.toLowerCase().includes(search)||r.BO_NAME.toLowerCase().includes(search)))}
@@ -112,18 +130,23 @@ function table(id,rows,headers){$(id).innerHTML='<table><thead><tr>'+headers.map
 function render(){let rows=filtered(),pli=rows.filter(r=>r.CARRIER_CODE==='PLI'),rpli=rows.filter(r=>r.CARRIER_CODE==='RPL'),amount=rows.reduce((s,r)=>s+r.AMOUNT_PAID,0);
 $('kPolicies').textContent=count(rows.length);$('kAmount').textContent=money(amount);$('kPli').textContent=count(pli.length);$('kPliAmt').textContent='Amount paid: '+money(pli.reduce((s,r)=>s+r.AMOUNT_PAID,0));$('kRpli').textContent=count(rpli.length);$('kRpliAmt').textContent='Amount paid: '+money(rpli.reduce((s,r)=>s+r.AMOUNT_PAID,0));$('status').textContent=count(rows.length)+' records';
 let divs=group(rows,'DO_NAME').sort((a,b)=>b.amount-a.amount);plot('divisionChart',[{type:'bar',name:'PLI',x:divs.map(x=>x.name),y:divs.map(x=>x.pliAmount),marker:{color:'#1769aa'}},{type:'bar',name:'RPLI',x:divs.map(x=>x.name),y:divs.map(x=>x.rpliAmount),marker:{color:'#e39a36'}}],{barmode:'group',margin:{l:65,r:10,t:15,b:105},xaxis:{tickangle:-35,automargin:true},yaxis:{title:'Amount paid (₹)',tickformat:'~s'}});
-// The date-wise trend is always restricted to the current calendar month.
-// Division, product and office filters are respected; the general From/To range does not change this chart.
-const now=new Date(), monthStart=new Date(now.getFullYear(),now.getMonth(),1), nextMonth=new Date(now.getFullYear(),now.getMonth()+1,1);
-const monthStartKey=monthStart.getFullYear()+'-'+String(monthStart.getMonth()+1).padStart(2,'0')+'-01';
-const monthName=now.toLocaleDateString('en-IN',{month:'long',year:'numeric'});
-$('dailyTrendTitle').textContent='Current Month Day-wise Indexing Trend ('+monthName+')';
-const divFilter=$('division').value,prodFilter=$('product').value,officeFilter=$('search').value.trim();
-const monthRows=normalize(rawData).filter(r=>r.CHECKIN_DATE>=monthStartKey&&r.CHECKIN_DATE<nextMonth.toISOString().slice(0,10)&&(!divFilter||r.DO_NAME===divFilter)&&(!prodFilter||r.CARRIER_CODE===prodFilter)&&(!officeFilter||r.SO_NAME===officeFilter||r.BO_NAME===officeFilter||r.HO_NAME===officeFilter));
+// Show the current month when it has records; otherwise fall back to the latest month
+// available for the selected division, product and office. This keeps the latest
+// indexing activity visible even when the dashboard is opened in a new month.
+const now=new Date();
+const divFilter=$('division').value,prodFilter=$('product').value,officeFilter=$('search').value.trim().toLowerCase();
+const trendBase=normalize(rawData).filter(r=>(!divFilter||r.DO_NAME===divFilter)&&(!prodFilter||r.CARRIER_CODE===prodFilter)&&(!officeFilter||r.SO_NAME.toLowerCase().includes(officeFilter)||r.BO_NAME.toLowerCase().includes(officeFilter)||String(r.HO_NAME||'').toLowerCase().includes(officeFilter)));
+const currentMonthKey=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+let trendMonthKey=currentMonthKey;
+let monthRows=trendBase.filter(r=>r.CHECKIN_DATE.slice(0,7)===trendMonthKey);
+if(!monthRows.length && trendBase.length){trendMonthKey=trendBase.map(r=>r.CHECKIN_DATE.slice(0,7)).sort().pop();monthRows=trendBase.filter(r=>r.CHECKIN_DATE.slice(0,7)===trendMonthKey);}
+const [trendYear,trendMonth]=trendMonthKey.split('-').map(Number);
+const monthName=new Date(trendYear,trendMonth-1,1).toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+$('dailyTrendTitle').textContent=(trendMonthKey===currentMonthKey?'Current Month':'Latest Available Month')+' Day-wise Indexing Trend ('+monthName+')';
 const groupedDaily=new Map(group(monthRows,'CHECKIN_DATE').map(x=>[x.name,x]));
 const monthLastData=monthRows.map(r=>r.CHECKIN_DATE).sort().pop();
 const lastDay=monthLastData?Number(monthLastData.slice(8,10)):now.getDate();
-const daily=[];for(let day=1;day<=lastDay;day++){const key=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(day).padStart(2,'0');daily.push(groupedDaily.get(key)||{name:key,policies:0,amount:0})}
+const daily=[];for(let day=1;day<=lastDay;day++){const key=trendMonthKey+'-'+String(day).padStart(2,'0');daily.push(groupedDaily.get(key)||{name:key,policies:0,amount:0})}
 plot('dailyChart',[{type:'scatter',mode:'lines+markers',name:'Policies',x:daily.map(x=>x.name),y:daily.map(x=>x.policies),line:{color:'#1769aa',width:3},hovertemplate:'%{x}<br>Policies: %{y}<extra></extra>'},{type:'bar',name:'Amount paid',x:daily.map(x=>x.name),y:daily.map(x=>x.amount),yaxis:'y2',opacity:.3,marker:{color:'#e39a36'},hovertemplate:'%{x}<br>Amount paid: ₹%{y:,.0f}<extra></extra>'}],{margin:{l:55,r:65,t:15,b:55},xaxis:{title:'Indexing date',type:'category'},yaxis:{title:'Policy count',rangemode:'tozero'},yaxis2:{title:'Amount paid (₹)',overlaying:'y',side:'right',showgrid:false,tickformat:'~s',rangemode:'tozero'}});
 let sos=group(rows,'SO_NAME'),bos=group(rows.filter(r=>String(r.BO_NAME||'').trim()),'BO_NAME');barRank('topSO',sos.slice().sort((a,b)=>b.amount-a.amount).slice(0,10));barRank('bottomSO',sos.slice().sort((a,b)=>a.amount-b.amount).slice(0,10).sort((a,b)=>b.amount-a.amount));barRank('topBO',bos.slice().sort((a,b)=>b.amount-a.amount).slice(0,10));barRank('bottomBO',bos.slice().sort((a,b)=>a.amount-b.amount).slice(0,10).sort((a,b)=>b.amount-a.amount));
 let subExists=rows.some(r=>r.SUB_DIVISION);$('subdivisionWarning').classList.toggle('hidden',subExists);let subs=subExists?group(rows,'SUB_DIVISION').sort((a,b)=>b.amount-a.amount):[];subs=subs.map((x,i)=>({...x,rank:i+1}));
@@ -178,7 +201,7 @@ function fillOffices(){
 }
 function refresh(){fillDivisions();fillOffices();render()}
 ['division','product','from','to','search'].forEach(id=>$(id).addEventListener('change',render));
-const DEFAULT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSXjRjllcFxcj3cbrd5-SncFeZIwbUM6IDnOEz3xQwQMiZewicN1K42xdc_FodwfKZZEmMfHNbluN4L/pub?gid=0&single=true&output=csv';
+const DEFAULT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSXjRjllcFxcj3cbrd5-SncFeZIwbUM6IDnOEz3xQwQMiZewicN1K42xdc_FodwfKZZEmMfHNbluN4L/pub?output=csv';
 function setDateRangeFromData(){
   const dates=normalize(rawData).map(r=>r.CHECKIN_DATE).filter(Boolean).sort();
   if(dates.length){$('from').value=dates[0];$('to').value=dates[dates.length-1]}
@@ -190,6 +213,7 @@ async function loadGoogleSheet(url, showAlerts=true){
     const response=await fetch(url,{cache:'no-store'});
     if(!response.ok)throw new Error('HTTP '+response.status);
     const csvText=await response.text();
+    if(!csvText.trim())throw new Error('The published CSV is empty.');
     if(csvText.trim().startsWith('<'))throw new Error('The URL returned a web page, not CSV. Publish the worksheet as CSV.');
     Papa.parse(csvText,{header:true,skipEmptyLines:true,complete:r=>{
       if(!r.data.length){$('status').textContent='No rows found';if(showAlerts)alert('No CSV rows found.');return}
@@ -198,24 +222,48 @@ async function loadGoogleSheet(url, showAlerts=true){
       const fields = (r.meta && r.meta.fields) ? r.meta.fields : Object.keys(r.data[0] || {});
       const cleanHeader = value => String(value || '').replace(/^\\uFEFF/, '').trim().toUpperCase().replace(/[\\s-]+/g, '_');
       const subField = fields.find(field => ['SUB_DIVISION','SUBDIVISION','SUB_DIVISION_NAME'].includes(cleanHeader(field)));
-      rawData = r.data.map(row => {
+      const sheetRows = r.data.map(row => {
         const cleaned = {...row};
         if (subField) cleaned.SUB_DIVISION = String(row[subField] ?? '').replace(/^\\uFEFF/, '').trim();
         return cleaned;
       });
+
+      // ADDITIVE IMPORT: preserve all repository records and append only genuinely
+      // new policies from the Google Sheet. Existing proposal records are never
+      // overwritten by a later version of the same row.
+      const recordKey = row => {
+        const proposal = String(row.PROPOSAL || row.PROPOSAL_NO || row.PROPOSAL_NUMBER || '').trim().toUpperCase();
+        if (proposal) return 'PROPOSAL:' + proposal;
+        return 'ROW:' + [
+          row.CARRIER_CODE, row.OFFICE_CODE, row.CHECKIN_D, row.CHECKIN_DATE,
+          row.SUM_ASSD, row.AMOUNT_PAID, row.SO_NAME, row.BO_NAME
+        ].map(v => String(v ?? '').trim().toUpperCase()).join('|');
+      };
+      const knownRecords = new Set(INITIAL_DATA.map(recordKey));
+      const newRows = [];
+      let duplicateRows = 0;
+      for (const row of sheetRows) {
+        const key = recordKey(row);
+        if (knownRecords.has(key)) {
+          duplicateRows++;
+          continue;
+        }
+        knownRecords.add(key);
+        newRows.push(row);
+      }
+      rawData = [...INITIAL_DATA, ...newRows];
       setDateRangeFromData();
       refresh();
       const assignedSubDivisions = rawData.filter(row => String(row.SUB_DIVISION || '').trim()).length;
-      if (!subField) {
-        $('status').textContent = 'Live sheet loaded, but SUB_DIVISION header was not found in the published CSV';
-        $('subdivisionWarning').innerHTML = '<b>Sub Division data unavailable:</b> the published CSV does not contain a recognized SUB_DIVISION header. Confirm the column is in the published worksheet (gid=0) and republish/update the CSV.';
-        $('subdivisionWarning').classList.remove('hidden');
-      } else if (!assignedSubDivisions) {
-        $('status').textContent = 'Live sheet loaded, but SUB_DIVISION values are blank';
-        $('subdivisionWarning').innerHTML = '<b>Sub Division data unavailable:</b> the SUB_DIVISION column was found, but all values are blank in the published CSV. Fill the column for each record and republish/update the CSV.';
+      $('status').textContent = 'Additive import complete • ' +
+        newRows.length.toLocaleString('en-IN') + ' new records added • ' +
+        duplicateRows.toLocaleString('en-IN') + ' existing/duplicate records skipped • ' +
+        INITIAL_DATA.length.toLocaleString('en-IN') + ' repository records retained';
+      if (!subField || !assignedSubDivisions) {
+        $('subdivisionWarning').innerHTML = '<b>Sub Division data note:</b> the imported CSV does not contain usable Sub Division values for all records. Division and office-level analysis will still be available; check the SUB_DIVISION column in the published sheet.';
         $('subdivisionWarning').classList.remove('hidden');
       } else {
-        $('status').textContent = 'Live Google Sheet loaded • Sub Division assigned for ' + assignedSubDivisions.toLocaleString('en-IN') + ' of ' + rawData.length.toLocaleString('en-IN') + ' rows';
+        $('subdivisionWarning').classList.add('hidden');
       }
     },error:e=>{ $('status').textContent='CSV parse failed'; if(showAlerts)alert(e.message); }});
   }catch(e){
