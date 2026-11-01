@@ -228,54 +228,72 @@ async function loadGoogleSheet(url, showAlerts=true){
         return cleaned;
       });
 
-      // MERGE IMPORT: keep repository records, but refresh every matching proposal
-      // with the latest Google Sheet details and amount paid. New proposals are added.
+      // MERGE IMPORT: the Google Sheet is authoritative for every proposal it
+      // contains. Keep ALL sheet rows, including repeated proposal numbers, so
+      // every amount-paid entry contributes to dashboard totals. Repository
+      // proposals absent from the sheet remain available.
       const proposalKey = row => String(row.PROPOSAL || row.PROPOSAL_NO || row.PROPOSAL_NUMBER || '').trim().toUpperCase();
-      const recordKey = row => {
-        const proposal = proposalKey(row);
-        if (proposal) return 'PROPOSAL:' + proposal;
-        return 'ROW:' + [row.CARRIER_CODE, row.OFFICE_CODE, row.CHECKIN_D, row.CHECKIN_DATE,
-          row.SUM_ASSD, row.AMOUNT_PAID, row.SO_NAME, row.BO_NAME]
-          .map(v => String(v ?? '').trim().toUpperCase()).join('|');
-      };
-      const mergedByProposal = new Map();
-      const recordsWithoutProposal = [];
+      const recordKey = row => 'ROW:' + [
+        row.CARRIER_CODE, row.OFFICE_CODE, row.CHECKIN_D, row.CHECKIN_DATE,
+        row.SUM_ASSD, row.AMOUNT_PAID, row.SO_NAME, row.BO_NAME
+      ].map(v => String(v ?? '').trim().toUpperCase()).join('|');
+
+      const repositoryByProposal = new Map();
+      const repositoryWithoutProposal = [];
       for (const original of INITIAL_DATA) {
-        const key = proposalKey(original);
-        if (key) mergedByProposal.set(key, original);
-        else recordsWithoutProposal.push(original);
+        const proposal = proposalKey(original);
+        if (proposal) repositoryByProposal.set(proposal, original);
+        else repositoryWithoutProposal.push(original);
       }
-      const newRowsWithoutProposal = [];
-      const seenSheetRows = new Set();
+
+      const sheetRowsByProposal = new Map();
+      const sheetRowsWithoutProposal = [];
+      const seenNoProposalRows = new Set();
       let updatedRecords = 0, newRecords = 0, duplicateRows = 0;
+
       for (const sourceRow of sheetRows) {
-        // Make the new sheet's CHECKIN_DATE authoritative over an older CHECKIN_D.
+        // The sheet's CHECKIN_DATE is authoritative over an older CHECKIN_D.
         const row = {...sourceRow};
         if (row.CHECKIN_DATE || row.checkin_date) row.CHECKIN_D = row.CHECKIN_DATE || row.checkin_date;
         const proposal = proposalKey(row);
+
         if (proposal) {
-          if (seenSheetRows.has('PROPOSAL:' + proposal)) duplicateRows++;
-          seenSheetRows.add('PROPOSAL:' + proposal);
-          if (mergedByProposal.has(proposal)) updatedRecords++;
-          else newRecords++;
-          // Later occurrences in the sheet win, so the most recent row is retained.
-          mergedByProposal.set(proposal, {...mergedByProposal.get(proposal), ...row});
+          if (!sheetRowsByProposal.has(proposal)) {
+            sheetRowsByProposal.set(proposal, []);
+            if (repositoryByProposal.has(proposal)) updatedRecords++;
+            else newRecords++;
+          } else {
+            duplicateRows++;
+          }
+          // Do not deduplicate: every occurrence in the Google Sheet is retained.
+          sheetRowsByProposal.get(proposal).push(row);
         } else {
           const key = recordKey(row);
-          if (seenSheetRows.has(key)) { duplicateRows++; continue; }
-          seenSheetRows.add(key);
-          newRowsWithoutProposal.push(row);
+          if (seenNoProposalRows.has(key)) { duplicateRows++; continue; }
+          seenNoProposalRows.add(key);
+          sheetRowsWithoutProposal.push(row);
           newRecords++;
         }
       }
-      rawData = [...mergedByProposal.values(), ...recordsWithoutProposal, ...newRowsWithoutProposal];
+
+      // Replace repository versions for proposals present in the sheet with all
+      // corresponding sheet rows. Keep repository-only proposals unchanged.
+      const repositoryOnlyRows = [...repositoryByProposal.entries()]
+        .filter(([proposal]) => !sheetRowsByProposal.has(proposal))
+        .map(([, row]) => row);
+      rawData = [
+        ...Array.from(sheetRowsByProposal.values()).flat(),
+        ...repositoryOnlyRows,
+        ...repositoryWithoutProposal,
+        ...sheetRowsWithoutProposal
+      ];
       setDateRangeFromData();
       refresh();
       const assignedSubDivisions = rawData.filter(row => String(row.SUB_DIVISION || '').trim()).length;
       $('status').textContent = 'Sheet sync complete • ' +
         updatedRecords.toLocaleString('en-IN') + ' existing proposals updated • ' +
         newRecords.toLocaleString('en-IN') + ' new records added • ' +
-        duplicateRows.toLocaleString('en-IN') + ' repeated sheet rows detected';
+        duplicateRows.toLocaleString('en-IN') + ' duplicate proposal rows included in totals';
       if (!subField || !assignedSubDivisions) {
         $('subdivisionWarning').innerHTML = '<b>Sub Division data note:</b> the imported CSV does not contain usable Sub Division values for all records. Division and office-level analysis will still be available; check the SUB_DIVISION column in the published sheet.';
         $('subdivisionWarning').classList.remove('hidden');
