@@ -25,6 +25,23 @@ select,input,button{font:inherit;border:1px solid #cbd6e1;border-radius:7px;padd
 button{background:var(--blue);color:white;border-color:var(--blue);font-weight:700;cursor:pointer}button.secondary{background:white;color:var(--blue)}
 .note{color:var(--muted);font-size:12px;flex-basis:100%}.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
 .kpi{padding:16px}.kpi .name{color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}.kpi .value{font-size:clamp(20px,2.5vw,30px);font-weight:800;margin-top:5px;color:var(--navy)}.kpi .sub{font-size:12px;color:var(--muted);margin-top:4px}
+
+.mom-panel{margin-bottom:16px}
+.mom-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.mom-heading h2{font-size:17px;margin:0 0 4px;color:var(--navy)}
+.mom-heading p{margin:0;color:var(--muted);font-size:12px}
+.mom-filter-note{font-size:11px;color:var(--muted);background:#f2f6fa;border-radius:20px;padding:6px 10px}
+.mom-table{width:100%;border-collapse:collapse;min-width:680px}
+.mom-table th,.mom-table td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+.mom-table th:first-child,.mom-table td:first-child{text-align:left}
+.mom-table thead th{background:#f3f7fb;color:var(--navy);font-size:11px;text-transform:uppercase}
+.mom-table tbody td{font-size:13px}
+.mom-table .metric{font-weight:700;color:var(--navy)}
+.mom-positive{color:#137547;font-weight:800}
+.mom-negative{color:#b42318;font-weight:800}
+.mom-neutral{color:var(--muted);font-weight:700}
+.mom-loading,.mom-error{padding:16px;color:var(--muted);font-size:13px}
+.mom-growth{font-size:11px;color:var(--muted);display:block;margin-top:2px}
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.panel{padding:15px;min-width:0}.panel h2{font-size:16px;margin:0 0 8px;color:var(--navy)}.panel-title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px}.panel-title-row h2{flex:1;margin:0}.pdf-btn{font-size:11px;padding:6px 9px;white-space:nowrap;flex-shrink:0}.pdf-export-clone{background:#fff;color:#172b3a;padding:18px;width:100%;font-family:Arial,sans-serif}.pdf-export-clone h2{color:#12304a;margin:0 0 12px}.pdf-export-clone .tablewrap{max-height:none;overflow:visible}.pdf-export-clone table{white-space:normal;width:100%;font-size:10px}.pdf-export-clone th,.pdf-export-clone td{position:static;padding:5px;border:1px solid #dce4ec}.pdf-export-clone .chart{height:360px}.wide{grid-column:1/-1}.chart{width:100%;height:350px}
 .tablewrap{overflow:auto;max-height:440px;border:1px solid var(--line);border-radius:8px}table{border-collapse:collapse;width:100%;font-size:12px;white-space:nowrap}th,td{padding:9px 10px;text-align:right;border-bottom:1px solid #e8edf2}th{background:#edf3f8;position:sticky;top:0;z-index:1;color:#29465d}td:first-child,th:first-child{text-align:left}tbody tr:hover{background:#f6faff}
 .status{font-size:12px;margin-left:auto;color:var(--muted);font-weight:700;max-width:100%;text-align:right}.warn{background:#fff7e5;border:1px solid #f0d79b;border-radius:8px;padding:10px 12px;margin-bottom:14px;color:#76520b}.hidden{display:none}
@@ -34,6 +51,7 @@ button{background:var(--blue);color:white;border-color:var(--blue);font-weight:7
 <div class="ticker" aria-label="Latest data date"><span id="tickerText">Data is updated only for the Previous Working Day</span></div>
 <main>
 <div class="toolbar">
+<div class="field"><label>Month</label><select id="month"><option value="2026-10">October 2026</option><option value="2026-11" selected>November 2026</option></select></div>
 <div class="field"><label>Division</label><select id="division"><option value="">All Divisions</option></select></div>
 <div class="field"><label>Product</label><select id="product"><option value="">PLI + RPLI</option><option value="PLI">PLI</option><option value="RPL">RPLI</option></select></div>
 <div class="field"><label>From date</label><input id="from" type="date"></div>
@@ -49,6 +67,18 @@ button{background:var(--blue);color:white;border-color:var(--blue);font-weight:7
 <div class="kpi"><div class="name">PLI policies</div><div class="value" id="kPli">–</div><div class="sub" id="kPliAmt">Amount paid: –</div></div>
 <div class="kpi"><div class="name">RPLI policies</div><div class="value" id="kRpli">–</div><div class="sub" id="kRpliAmt">Amount paid: –</div></div>
 </div>
+<section class="panel wide mom-panel" id="monthComparison">
+  <div class="mom-heading">
+    <div>
+      <h2>Month-on-Month Business Comparison</h2>
+      <p id="momSubtitle">Comparing October 2026 with November 2026</p>
+    </div>
+    <span class="mom-filter-note">Follows Division, Product and Office filters; compares full months</span>
+  </div>
+  <div id="momContent" class="tablewrap">
+    <div class="mom-loading">Loading October and November figures for comparison…</div>
+  </div>
+</section>
 <section class="insight" id="performanceInsights"><h2>Performance Comments</h2><div id="insightText">Performance observations will appear here after data loads.</div></section>
 <div class="grid">
 <section class="panel"><h2>Division performance: PLI vs RPLI</h2><div id="divisionChart" class="chart"></div></section>
@@ -127,7 +157,7 @@ function group(rows,key){let m=new Map();rows.forEach(r=>{let k=r[key]||'Unassig
 function plot(id,data,layout={}){Plotly.react(id,data,{margin:{l:100,r:20,t:10,b:60},paper_bgcolor:'white',plot_bgcolor:'white',font:{family:'Arial',color:'#29465d',size:11},legend:{orientation:'h',y:1.12},...layout},{responsive:true,displaylogo:false})}
 function barRank(id,rows){let s=[...rows].sort((a,b)=>b.amount-a.amount);plot(id,[{type:'bar',orientation:'h',y:s.map(x=>x.name).reverse(),x:s.map(x=>x.amount).reverse(),marker:{color:'#1769aa'},hovertemplate:'%{y}<br>Amount paid: ₹%{x:,.0f}<extra></extra>'}],{margin:{l:150,r:20,t:10,b:45},xaxis:{title:'Total amount paid (₹)',tickformat:',.0f'},yaxis:{automargin:true}})}
 function table(id,rows,headers){$(id).innerHTML='<table><thead><tr>'+headers.map(h=>'<th>'+esc(h.label)+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+headers.map(h=>'<td>'+esc(h.format?h.format(r[h.key]):r[h.key])+'</td>').join('')+'</tr>').join('')+'</tbody></table>'}
-function render(){let rows=filtered(),pli=rows.filter(r=>r.CARRIER_CODE==='PLI'),rpli=rows.filter(r=>r.CARRIER_CODE==='RPL'),amount=rows.reduce((s,r)=>s+r.AMOUNT_PAID,0);
+function render(){renderMonthComparison();let rows=filtered(),pli=rows.filter(r=>r.CARRIER_CODE==='PLI'),rpli=rows.filter(r=>r.CARRIER_CODE==='RPL'),amount=rows.reduce((s,r)=>s+r.AMOUNT_PAID,0);
 $('kPolicies').textContent=count(rows.length);$('kAmount').textContent=money(amount);$('kPli').textContent=count(pli.length);$('kPliAmt').textContent='Amount paid: '+money(pli.reduce((s,r)=>s+r.AMOUNT_PAID,0));$('kRpli').textContent=count(rpli.length);$('kRpliAmt').textContent='Amount paid: '+money(rpli.reduce((s,r)=>s+r.AMOUNT_PAID,0));$('status').textContent=count(rows.length)+' records';
 let divs=group(rows,'DO_NAME').sort((a,b)=>b.amount-a.amount);plot('divisionChart',[{type:'bar',name:'PLI',x:divs.map(x=>x.name),y:divs.map(x=>x.pliAmount),marker:{color:'#1769aa'}},{type:'bar',name:'RPLI',x:divs.map(x=>x.name),y:divs.map(x=>x.rpliAmount),marker:{color:'#e39a36'}}],{barmode:'group',margin:{l:65,r:10,t:15,b:105},xaxis:{tickangle:-35,automargin:true},yaxis:{title:'Amount paid (₹)',tickformat:'~s'}});
 // Show the current month when it has records; otherwise fall back to the latest month
@@ -201,109 +231,238 @@ function fillOffices(){
 }
 function refresh(){fillDivisions();fillOffices();render()}
 ['division','product','from','to','search'].forEach(id=>$(id).addEventListener('change',render));
-const DEFAULT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSXjRjllcFxcj3cbrd5-SncFeZIwbUM6IDnOEz3xQwQMiZewicN1K42xdc_FodwfKZZEmMfHNbluN4L/pub?output=csv';
+const MONTH_SHEET_URLS = {
+  '2026-10': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSXjRjllcFxcj3cbrd5-SncFeZIwbUM6IDnOEz3xQwQMiZewicN1K42xdc_FodwfKZZEmMfHNbluN4L/pub?output=csv',
+  '2026-11': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSXjRjllcFxcj3cbrd5-SncFeZIwbUM6IDnOEz3xQwQMiZewicN1K42xdc_FodwfKZZEmMfHNbluN4L/pub?gid=380499676&single=true&output=csv'
+};
+const MONTH_LABELS = {'2026-10':'October 2026','2026-11':'November 2026'};
+
+const MONTH_DATA_CACHE = {};
+let monthLoadSequence = 0;
+
+function proposalKeyForMonth(row){
+  return String(row.PROPOSAL||row.PROPOSAL_NO||row.PROPOSAL_NUMBER||'').trim().toUpperCase();
+}
+
+function buildMonthData(month,sheetRows){
+  if(month==='2026-11') return sheetRows.slice();
+
+  // October includes the original repository baseline. For proposals present in
+  // the October sheet, retain every sheet row, including duplicate proposals.
+  const repositoryByProposal=new Map();
+  const repositoryWithoutProposal=[];
+  for(const original of INITIAL_DATA){
+    const proposal=proposalKeyForMonth(original);
+    if(proposal)repositoryByProposal.set(proposal,original);
+    else repositoryWithoutProposal.push(original);
+  }
+  const sheetRowsByProposal=new Map();
+  const sheetRowsWithoutProposal=[];
+  for(const row of sheetRows){
+    const proposal=proposalKeyForMonth(row);
+    if(proposal){
+      if(!sheetRowsByProposal.has(proposal))sheetRowsByProposal.set(proposal,[]);
+      sheetRowsByProposal.get(proposal).push(row);
+    }else{
+      sheetRowsWithoutProposal.push(row);
+    }
+  }
+  const repositoryOnlyRows=[...repositoryByProposal.entries()]
+    .filter(([proposal])=>!sheetRowsByProposal.has(proposal))
+    .map(([,row])=>row);
+  return [
+    ...Array.from(sheetRowsByProposal.values()).flat(),
+    ...repositoryOnlyRows,
+    ...repositoryWithoutProposal,
+    ...sheetRowsWithoutProposal
+  ];
+}
+
+async function fetchMonthData(month){
+  const response=await fetch(MONTH_SHEET_URLS[month],{cache:'no-store'});
+  if(!response.ok)throw new Error('HTTP '+response.status);
+  const csvText=await response.text();
+  if(!csvText.trim())throw new Error('The published CSV is empty.');
+  if(csvText.trim().startsWith('<'))throw new Error('The URL returned HTML instead of CSV.');
+  const parsed=await new Promise((resolve,reject)=>{
+    Papa.parse(csvText,{header:true,skipEmptyLines:true,complete:resolve,error:reject});
+  });
+  if(!parsed.data||!parsed.data.length)throw new Error('No rows found in '+MONTH_LABELS[month]+'.');
+  const fields=(parsed.meta&&parsed.meta.fields)?parsed.meta.fields:Object.keys(parsed.data[0]||{});
+  const cleanHeader=value=>String(value||'').replace(/^\uFEFF/,'').trim().toUpperCase().replace(/[\s-]+/g,'_');
+  const subField=fields.find(field=>['SUB_DIVISION','SUBDIVISION','SUB_DIVISION_NAME'].includes(cleanHeader(field)));
+  const rows=parsed.data.map(source=>{
+    const row={...source};
+    if(subField)row.SUB_DIVISION=String(source[subField]??'').replace(/^\uFEFF/,'').trim();
+    if(row.CHECKIN_DATE||row.checkin_date)row.CHECKIN_D=row.CHECKIN_DATE||row.checkin_date;
+    return row;
+  });
+  return buildMonthData(month,rows);
+}
+
+function comparisonRowsFor(month){
+  const rows=normalize(MONTH_DATA_CACHE[month]||[]);
+  const division=$('division').value,product=$('product').value,search=$('search').value.trim().toLowerCase();
+  return rows.filter(row=>
+    (!division||row.DO_NAME===division)&&
+    (!product||row.CARRIER_CODE===product)&&
+    (!search||row.SO_NAME.toLowerCase().includes(search)||row.BO_NAME.toLowerCase().includes(search))
+  );
+}
+
+function summarizeMonth(month){
+  const rows=comparisonRowsFor(month);
+  const sum=list=>list.reduce((total,row)=>total+row.AMOUNT_PAID,0);
+  const pli=rows.filter(row=>row.CARRIER_CODE==='PLI');
+  const rpli=rows.filter(row=>row.CARRIER_CODE==='RPL');
+  return {
+    policies:rows.length,
+    amount:sum(rows),
+    pliPolicies:pli.length,
+    pliAmount:sum(pli),
+    rpliPolicies:rpli.length,
+    rpliAmount:sum(rpli)
+  };
+}
+
+function renderMonthComparison(){
+  const container=$('momContent');
+  if(!container)return;
+  const oct=MONTH_DATA_CACHE['2026-10'],nov=MONTH_DATA_CACHE['2026-11'];
+  if(!oct||!nov){
+    container.innerHTML='<div class="mom-loading">Loading both monthly worksheets. The comparison will appear automatically when both are available.</div>';
+    return;
+  }
+  const a=summarizeMonth('2026-10'),b=summarizeMonth('2026-11');
+  const metrics=[
+    {label:'Total premium amount paid',key:'amount',format:money},
+    {label:'Policies indexed',key:'policies',format:count},
+    {label:'PLI amount paid',key:'pliAmount',format:money},
+    {label:'PLI policies',key:'pliPolicies',format:count},
+    {label:'RPLI amount paid',key:'rpliAmount',format:money},
+    {label:'RPLI policies',key:'rpliPolicies',format:count}
+  ];
+  const growth=(previous,current)=>{
+    if(previous===0)return current===0?'0.0%':'New';
+    return ((current-previous)/previous*100).toFixed(1)+'%';
+  };
+  const change=(previous,current)=>current-previous;
+  const fmtChange=(previous,current,isMoney)=>{
+    const diff=change(previous,current);
+    const label=(diff>0?'+':diff<0?'−':'')+(isMoney?money(Math.abs(diff)):count(Math.abs(diff)));
+    const cls=diff>0?'mom-positive':diff<0?'mom-negative':'mom-neutral';
+    return '<span class="'+cls+'">'+label+'</span>';
+  };
+  container.innerHTML='<table class="mom-table"><thead><tr>'+
+    '<th>Business indicator</th><th>October 2026</th><th>November 2026</th><th>Change</th><th>Growth</th>'+
+    '</tr></thead><tbody>'+
+    metrics.map(metric=>{
+      const previous=a[metric.key],current=b[metric.key],isMoney=metric.key.toLowerCase().includes('amount');
+      const rate=growth(previous,current);
+      const rateClass=current>previous?'mom-positive':current<previous?'mom-negative':'mom-neutral';
+      return '<tr><td class="metric">'+metric.label+'</td><td>'+metric.format(previous)+'</td><td>'+metric.format(current)+'</td><td>'+fmtChange(previous,current,isMoney)+'</td><td><span class="'+rateClass+'">'+(current>previous&&previous!==0?'+':'')+rate+'</span></td></tr>';
+    }).join('')+
+    '</tbody></table>';
+  $('momSubtitle').textContent='October 2026 vs November 2026 • '+( $('division').value||'All Divisions' )+' • '+($('product').value==='PLI'?'PLI':$('product').value==='RPL'?'RPLI':'PLI + RPLI');
+}
+
+async function ensureComparisonData(){
+  const selected=$('month').value;
+  const other=selected==='2026-10'?'2026-11':'2026-10';
+  if(MONTH_DATA_CACHE[other]){renderMonthComparison();return;}
+  try{
+    const data=await fetchMonthData(other);
+    MONTH_DATA_CACHE[other]=data;
+    renderMonthComparison();
+  }catch(error){
+    const container=$('momContent');
+    if(container)container.innerHTML='<div class="mom-error">Could not load '+MONTH_LABELS[other]+' for comparison. Please confirm that its worksheet is published as CSV. '+esc(error.message)+'</div>';
+  }
+}
+
+
 function setDateRangeFromData(){
   const dates=normalize(rawData).map(r=>r.CHECKIN_DATE).filter(Boolean).sort();
-  if(dates.length){$('from').value=dates[0];$('to').value=dates[dates.length-1]}
+  if(dates.length){
+    $('from').value=dates[0];
+    $('to').value=dates[dates.length-1];
+  } else {
+    $('from').value='';
+    $('to').value='';
+  }
 }
-async function loadGoogleSheet(url, showAlerts=true){
-  if(!url){if(showAlerts)alert('Paste the published Google Sheets CSV URL first.');return}
+
+async function loadSelectedMonth(showAlerts=true){
+  const requestId=++monthLoadSequence;
+  const month=$('month').value;
+  const url=MONTH_SHEET_URLS[month];
+  if(!url){if(showAlerts)alert('No Google Sheets source is configured for this month.');return;}
+  const isOctober=month==='2026-10';
+
+  $('status').textContent='Loading '+MONTH_LABELS[month]+' data…';
+  // Never leave October figures visible while November is being loaded.
+  rawData=isOctober ? INITIAL_DATA.slice() : [];
+  refresh();
+
   try{
-    $('status').textContent='Loading Google Sheet…';
     const response=await fetch(url,{cache:'no-store'});
+    if(requestId!==monthLoadSequence)return;
     if(!response.ok)throw new Error('HTTP '+response.status);
     const csvText=await response.text();
     if(!csvText.trim())throw new Error('The published CSV is empty.');
     if(csvText.trim().startsWith('<'))throw new Error('The URL returned a web page, not CSV. Publish the worksheet as CSV.');
+
     Papa.parse(csvText,{header:true,skipEmptyLines:true,complete:r=>{
-      if(!r.data.length){$('status').textContent='No rows found';if(showAlerts)alert('No CSV rows found.');return}
-      // Normalize the SUB_DIVISION header so variations such as "Sub Division",
-      // "SUB-DIVISION", spaces, or a UTF-8 BOM are recognized.
-      const fields = (r.meta && r.meta.fields) ? r.meta.fields : Object.keys(r.data[0] || {});
-      const cleanHeader = value => String(value || '').replace(/^\\uFEFF/, '').trim().toUpperCase().replace(/[\\s-]+/g, '_');
-      const subField = fields.find(field => ['SUB_DIVISION','SUBDIVISION','SUB_DIVISION_NAME'].includes(cleanHeader(field)));
-      const sheetRows = r.data.map(row => {
-        const cleaned = {...row};
-        if (subField) cleaned.SUB_DIVISION = String(row[subField] ?? '').replace(/^\\uFEFF/, '').trim();
+      if(!r.data.length){
+        $('status').textContent='No rows found for '+MONTH_LABELS[month];
+        if(showAlerts)alert('No CSV rows found for '+MONTH_LABELS[month]+'.');
+        return;
+      }
+
+      // Normalize the Sub Division header, including spaces, hyphens and BOM.
+      const fields=(r.meta&&r.meta.fields)?r.meta.fields:Object.keys(r.data[0]||{});
+      const cleanHeader=value=>String(value||'').replace(/^\uFEFF/,'').trim().toUpperCase().replace(/[\s-]+/g,'_');
+      const subField=fields.find(field=>['SUB_DIVISION','SUBDIVISION','SUB_DIVISION_NAME'].includes(cleanHeader(field)));
+      const sheetRows=r.data.map(row=>{
+        const cleaned={...row};
+        if(subField)cleaned.SUB_DIVISION=String(row[subField]??'').replace(/^\uFEFF/,'').trim();
+        // Make the selected worksheet's CHECKIN_DATE authoritative.
+        if(cleaned.CHECKIN_DATE||cleaned.checkin_date)cleaned.CHECKIN_D=cleaned.CHECKIN_DATE||cleaned.checkin_date;
         return cleaned;
       });
 
-      // MERGE IMPORT: the Google Sheet is authoritative for every proposal it
-      // contains. Keep ALL sheet rows, including repeated proposal numbers, so
-      // every amount-paid entry contributes to dashboard totals. Repository
-      // proposals absent from the sheet remain available.
-      const proposalKey = row => String(row.PROPOSAL || row.PROPOSAL_NO || row.PROPOSAL_NUMBER || '').trim().toUpperCase();
-      const recordKey = row => 'ROW:' + [
-        row.CARRIER_CODE, row.OFFICE_CODE, row.CHECKIN_D, row.CHECKIN_DATE,
-        row.SUM_ASSD, row.AMOUNT_PAID, row.SO_NAME, row.BO_NAME
-      ].map(v => String(v ?? '').trim().toUpperCase()).join('|');
-
-      const repositoryByProposal = new Map();
-      const repositoryWithoutProposal = [];
-      for (const original of INITIAL_DATA) {
-        const proposal = proposalKey(original);
-        if (proposal) repositoryByProposal.set(proposal, original);
-        else repositoryWithoutProposal.push(original);
-      }
-
-      const sheetRowsByProposal = new Map();
-      const sheetRowsWithoutProposal = [];
-      const seenNoProposalRows = new Set();
-      let updatedRecords = 0, newRecords = 0, duplicateRows = 0;
-
-      for (const sourceRow of sheetRows) {
-        // The sheet's CHECKIN_DATE is authoritative over an older CHECKIN_D.
-        const row = {...sourceRow};
-        if (row.CHECKIN_DATE || row.checkin_date) row.CHECKIN_D = row.CHECKIN_DATE || row.checkin_date;
-        const proposal = proposalKey(row);
-
-        if (proposal) {
-          if (!sheetRowsByProposal.has(proposal)) {
-            sheetRowsByProposal.set(proposal, []);
-            if (repositoryByProposal.has(proposal)) updatedRecords++;
-            else newRecords++;
-          } else {
-            duplicateRows++;
-          }
-          // Do not deduplicate: every occurrence in the Google Sheet is retained.
-          sheetRowsByProposal.get(proposal).push(row);
-        } else {
-          const key = recordKey(row);
-          if (seenNoProposalRows.has(key)) { duplicateRows++; continue; }
-          seenNoProposalRows.add(key);
-          sheetRowsWithoutProposal.push(row);
-          newRecords++;
-        }
-      }
-
-      // Replace repository versions for proposals present in the sheet with all
-      // corresponding sheet rows. Keep repository-only proposals unchanged.
-      const repositoryOnlyRows = [...repositoryByProposal.entries()]
-        .filter(([proposal]) => !sheetRowsByProposal.has(proposal))
-        .map(([, row]) => row);
-      rawData = [
-        ...Array.from(sheetRowsByProposal.values()).flat(),
-        ...repositoryOnlyRows,
-        ...repositoryWithoutProposal,
-        ...sheetRowsWithoutProposal
-      ];
+      rawData=buildMonthData(month,sheetRows);
+      MONTH_DATA_CACHE[month]=rawData.slice();
+      $('status').textContent=MONTH_LABELS[month]+' data loaded • '+
+        rawData.length.toLocaleString('en-IN')+' records';
       setDateRangeFromData();
       refresh();
-      const assignedSubDivisions = rawData.filter(row => String(row.SUB_DIVISION || '').trim()).length;
-      $('status').textContent = 'Sheet sync complete • ' +
-        updatedRecords.toLocaleString('en-IN') + ' existing proposals updated • ' +
-        newRecords.toLocaleString('en-IN') + ' new records added • ' +
-        duplicateRows.toLocaleString('en-IN') + ' duplicate proposal rows included in totals';
-      if (!subField || !assignedSubDivisions) {
-        $('subdivisionWarning').innerHTML = '<b>Sub Division data note:</b> the imported CSV does not contain usable Sub Division values for all records. Division and office-level analysis will still be available; check the SUB_DIVISION column in the published sheet.';
+      renderMonthComparison();
+      ensureComparisonData();
+      const assignedSubDivisions=rawData.filter(row=>String(row.SUB_DIVISION||row.sub_division||'').trim()).length;
+      if(!subField||!assignedSubDivisions){
+        $('subdivisionWarning').innerHTML='<b>Sub Division data note:</b> the selected worksheet does not contain usable Sub Division values for all records. Division and office-level analysis will still be available; check the SUB_DIVISION column.';
         $('subdivisionWarning').classList.remove('hidden');
-      } else {
+      }else{
         $('subdivisionWarning').classList.add('hidden');
       }
-    },error:e=>{ $('status').textContent='CSV parse failed'; if(showAlerts)alert(e.message); }});
+    },error:e=>{
+      $('status').textContent='CSV parse failed for '+MONTH_LABELS[month];
+      if(showAlerts)alert(e.message);
+    }});
   }catch(e){
-    $('status').textContent='Google Sheet load failed; showing saved sample data';
-    if(showAlerts)alert('Could not load the sheet. Check that it is published as CSV and publicly viewable. Details: '+e.message);
+    if(isOctober){
+      rawData=INITIAL_DATA.slice();
+      setDateRangeFromData();
+      refresh();
+    }else{
+      rawData=[];
+      $('from').value='';
+      $('to').value='';
+      refresh();
+    }
+    $('status').textContent=MONTH_LABELS[month]+' sheet could not be loaded';
+    if(showAlerts)alert('Could not load '+MONTH_LABELS[month]+'. Check that the worksheet is published as CSV and publicly viewable. Details: '+e.message);
   }
 }
 function setupSectionPdfExports(){
@@ -336,5 +495,6 @@ rawData=INITIAL_DATA;
 setDateRangeFromData();
 refresh();
 setupSectionPdfExports();
-loadGoogleSheet(DEFAULT_SHEET_URL,false);
+$('month').addEventListener('change',()=>loadSelectedMonth(true));
+loadSelectedMonth(false);
 </script></body></html>
