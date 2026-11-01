@@ -228,37 +228,54 @@ async function loadGoogleSheet(url, showAlerts=true){
         return cleaned;
       });
 
-      // ADDITIVE IMPORT: preserve all repository records and append only genuinely
-      // new policies from the Google Sheet. Existing proposal records are never
-      // overwritten by a later version of the same row.
+      // MERGE IMPORT: keep repository records, but refresh every matching proposal
+      // with the latest Google Sheet details and amount paid. New proposals are added.
+      const proposalKey = row => String(row.PROPOSAL || row.PROPOSAL_NO || row.PROPOSAL_NUMBER || '').trim().toUpperCase();
       const recordKey = row => {
-        const proposal = String(row.PROPOSAL || row.PROPOSAL_NO || row.PROPOSAL_NUMBER || '').trim().toUpperCase();
+        const proposal = proposalKey(row);
         if (proposal) return 'PROPOSAL:' + proposal;
-        return 'ROW:' + [
-          row.CARRIER_CODE, row.OFFICE_CODE, row.CHECKIN_D, row.CHECKIN_DATE,
-          row.SUM_ASSD, row.AMOUNT_PAID, row.SO_NAME, row.BO_NAME
-        ].map(v => String(v ?? '').trim().toUpperCase()).join('|');
+        return 'ROW:' + [row.CARRIER_CODE, row.OFFICE_CODE, row.CHECKIN_D, row.CHECKIN_DATE,
+          row.SUM_ASSD, row.AMOUNT_PAID, row.SO_NAME, row.BO_NAME]
+          .map(v => String(v ?? '').trim().toUpperCase()).join('|');
       };
-      const knownRecords = new Set(INITIAL_DATA.map(recordKey));
-      const newRows = [];
-      let duplicateRows = 0;
-      for (const row of sheetRows) {
-        const key = recordKey(row);
-        if (knownRecords.has(key)) {
-          duplicateRows++;
-          continue;
-        }
-        knownRecords.add(key);
-        newRows.push(row);
+      const mergedByProposal = new Map();
+      const recordsWithoutProposal = [];
+      for (const original of INITIAL_DATA) {
+        const key = proposalKey(original);
+        if (key) mergedByProposal.set(key, original);
+        else recordsWithoutProposal.push(original);
       }
-      rawData = [...INITIAL_DATA, ...newRows];
+      const newRowsWithoutProposal = [];
+      const seenSheetRows = new Set();
+      let updatedRecords = 0, newRecords = 0, duplicateRows = 0;
+      for (const sourceRow of sheetRows) {
+        // Make the new sheet's CHECKIN_DATE authoritative over an older CHECKIN_D.
+        const row = {...sourceRow};
+        if (row.CHECKIN_DATE || row.checkin_date) row.CHECKIN_D = row.CHECKIN_DATE || row.checkin_date;
+        const proposal = proposalKey(row);
+        if (proposal) {
+          if (seenSheetRows.has('PROPOSAL:' + proposal)) duplicateRows++;
+          seenSheetRows.add('PROPOSAL:' + proposal);
+          if (mergedByProposal.has(proposal)) updatedRecords++;
+          else newRecords++;
+          // Later occurrences in the sheet win, so the most recent row is retained.
+          mergedByProposal.set(proposal, {...mergedByProposal.get(proposal), ...row});
+        } else {
+          const key = recordKey(row);
+          if (seenSheetRows.has(key)) { duplicateRows++; continue; }
+          seenSheetRows.add(key);
+          newRowsWithoutProposal.push(row);
+          newRecords++;
+        }
+      }
+      rawData = [...mergedByProposal.values(), ...recordsWithoutProposal, ...newRowsWithoutProposal];
       setDateRangeFromData();
       refresh();
       const assignedSubDivisions = rawData.filter(row => String(row.SUB_DIVISION || '').trim()).length;
-      $('status').textContent = 'Additive import complete • ' +
-        newRows.length.toLocaleString('en-IN') + ' new records added • ' +
-        duplicateRows.toLocaleString('en-IN') + ' existing/duplicate records skipped • ' +
-        INITIAL_DATA.length.toLocaleString('en-IN') + ' repository records retained';
+      $('status').textContent = 'Sheet sync complete • ' +
+        updatedRecords.toLocaleString('en-IN') + ' existing proposals updated • ' +
+        newRecords.toLocaleString('en-IN') + ' new records added • ' +
+        duplicateRows.toLocaleString('en-IN') + ' repeated sheet rows detected';
       if (!subField || !assignedSubDivisions) {
         $('subdivisionWarning').innerHTML = '<b>Sub Division data note:</b> the imported CSV does not contain usable Sub Division values for all records. Division and office-level analysis will still be available; check the SUB_DIVISION column in the published sheet.';
         $('subdivisionWarning').classList.remove('hidden');
