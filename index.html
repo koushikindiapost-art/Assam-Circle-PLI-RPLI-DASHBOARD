@@ -395,28 +395,88 @@ function buildMonthData(month,sheetRows){
   ];
 }
 
-async function fetchMonthData(month){
-  const response=await fetch(MONTH_SHEET_URLS[month],{cache:'no-store'});
-  if(!response.ok)throw new Error('HTTP '+response.status);
-  const csvText=await response.text();
-  if(!csvText.trim())throw new Error('The published CSV is empty.');
-  if(csvText.trim().startsWith('<'))throw new Error('The URL returned HTML instead of CSV.');
-  const parsed=await new Promise((resolve,reject)=>{
-    Papa.parse(csvText,{header:true,skipEmptyLines:true,complete:resolve,error:reject});
+function googleVizToRows(payload){
+  if(!payload || payload.status!=='ok' || !payload.table) {
+    const message=payload?.errors?.map(e=>e.detailed_message||e.message).filter(Boolean).join('; ');
+    throw new Error(message || 'Google Sheets did not return a valid table.');
+  }
+  const cols=payload.table.cols||[];
+  const headers=cols.map((col,i)=>String(col.label||col.id||('COLUMN_'+(i+1))).trim());
+  return (payload.table.rows||[]).map(record=>{
+    const row={};
+    (record.c||[]).forEach((cell,i)=>{
+      if(i>=headers.length)return;
+      let value=cell?cell.v:null;
+      // Google Visualization serializes date cells as Date(YYYY,MM,DD).
+      if(typeof value==='string'){
+        const dateMatch=value.match(/^Date\((\d{4}),(\d{1,2}),(\d{1,2})(?:,(\d+),(\d+),(\d+))?\)$/);
+        if(dateMatch){
+          const y=Number(dateMatch[1]),m=Number(dateMatch[2])+1,d=Number(dateMatch[3]);
+          value=String(d).padStart(2,'0')+'/'+String(m).padStart(2,'0')+'/'+String(y);
+        }
+      }
+      row[headers[i]]=value;
+    });
+    return row;
+  }).filter(row=>Object.values(row).some(v=>v!==null&&v!==''));
+}
+
+function loadGoogleSheetJsonp(month){
+  return new Promise((resolve,reject)=>{
+    const gid=month==='2026-11'?'380499676':'0';
+    const callback='__assamSheetCallback_'+Date.now()+'_'+Math.floor(Math.random()*1000000);
+    const script=document.createElement('script');
+    let settled=false;
+    const cleanup=()=>{
+      if(script.parentNode)script.parentNode.removeChild(script);
+      try{delete window[callback];}catch(_){window[callback]=undefined;}
+      clearTimeout(timer);
+    };
+    const finish=(fn,value)=>{if(settled)return;settled=true;cleanup();fn(value);};
+    window[callback]=payload=>{
+      try{finish(resolve,googleVizToRows(payload));}
+      catch(error){finish(reject,error);}
+    };
+    script.onerror=()=>finish(reject,new Error('Google Sheets JSONP request failed. Confirm that the sheet is published to the web.'));
+    const timer=setTimeout(()=>finish(reject,new Error('Google Sheets request timed out.')),20000);
+    const base='https://docs.google.com/spreadsheets/d/e/2PACX-1vSXjRjllcFxcj3cbrd5-SncFeZIwbUM6IDnOEz3xQwQMiZewicN1K42xdc_FodwfKZZEmMfHNbluN4L/gviz/tq';
+    script.src=base+'?tqx='+encodeURIComponent('out:json;responseHandler:'+callback)+'&gid='+encodeURIComponent(gid)+'&headers=1';
+    document.head.appendChild(script);
   });
-  if(!parsed.data||!parsed.data.length)throw new Error('No rows found in '+MONTH_LABELS[month]+'.');
-  const fields=(parsed.meta&&parsed.meta.fields)?parsed.meta.fields:Object.keys(parsed.data[0]||{});
+}
+
+async function fetchMonthData(month){
+  let sheetRows;
+  let csvError=null;
+  try{
+    // Try the published CSV first. If the browser blocks it because of CORS,
+    // use Google's JSONP endpoint, which does not require fetch CORS permission.
+    const response=await fetch(MONTH_SHEET_URLS[month],{cache:'no-store'});
+    if(!response.ok)throw new Error('HTTP '+response.status);
+    const csvText=await response.text();
+    if(!csvText.trim())throw new Error('The published CSV is empty.');
+    if(csvText.trim().startsWith('<'))throw new Error('The URL returned HTML instead of CSV.');
+    const parsed=Papa.parse(csvText,{header:true,skipEmptyLines:true});
+    if(parsed.errors?.length && !parsed.data?.length)throw new Error(parsed.errors[0].message);
+    sheetRows=parsed.data||[];
+  }catch(error){csvError=error;}
+  if(!sheetRows||!sheetRows.length){
+    try{sheetRows=await loadGoogleSheetJsonp(month);}
+    catch(jsonpError){throw new Error('CSV access failed ('+(csvError?.message||'no CSV rows')+'); Google Sheets fallback failed ('+jsonpError.message+').');}
+  }
+  if(!sheetRows.length)throw new Error('No data rows were returned for '+MONTH_LABELS[month]+'.');
+  const fields=Object.keys(sheetRows[0]||{});
   const cleanHeader=value=>String(value||'').replace(/^\uFEFF/,'').trim().toUpperCase().replace(/[\s-]+/g,'_');
   const subField=fields.find(field=>['SUB_DIVISION','SUBDIVISION','SUB_DIVISION_NAME'].includes(cleanHeader(field)));
-  const rows=parsed.data.map(source=>{
+  const rows=sheetRows.map(source=>{
     const row={...source};
     if(subField)row.SUB_DIVISION=String(source[subField]??'').replace(/^\uFEFF/,'').trim();
-    if(row.CHECKIN_DATE||row.checkin_date)row.CHECKIN_D=row.CHECKIN_DATE||row.checkin_date;
+    const dateField=fields.find(field=>cleanHeader(field)==='CHECKIN_DATE')||fields.find(field=>cleanHeader(field)==='CHECKIN_D');
+    if(dateField){row.CHECKIN_DATE=source[dateField];row.CHECKIN_D=source[dateField];}
     return row;
   });
   return buildMonthData(month,rows);
 }
-
 function comparisonRowsFor(month){
   const rows=normalize(MONTH_DATA_CACHE[month]||[]);
   const division=$('division').value,product=$('product').value,search=$('search').value.trim().toLowerCase();
@@ -514,78 +574,37 @@ async function loadSelectedMonth(showAlerts=true){
   const fetchBtn=$('fetchDataBtn');
   if(fetchBtn){fetchBtn.disabled=true;fetchBtn.textContent='Fetching…';}
   const month=$('month').value;
-  const url=MONTH_SHEET_URLS[month];
-  if(!url){if(fetchBtn){fetchBtn.disabled=false;fetchBtn.textContent='Fetch Data';}if(showAlerts)alert('No Google Sheets source is configured for this month.');return;}
   const isOctober=month==='2026-10';
-
-  $('status').textContent='Loading '+MONTH_LABELS[month]+' data…';
-  // Never leave October figures visible while November is being loaded.
-  rawData=isOctober ? INITIAL_DATA.slice() : [];
+  $('status').textContent='Connecting to Google Sheets for '+MONTH_LABELS[month]+'…';
+  // Clear the previous month's data while the requested month is being loaded.
+  rawData=[];
   refresh();
-
   try{
-    const response=await fetch(url,{cache:'no-store'});
+    const data=await fetchMonthData(month);
     if(requestId!==monthLoadSequence)return;
-    if(!response.ok)throw new Error('HTTP '+response.status);
-    const csvText=await response.text();
-    if(!csvText.trim())throw new Error('The published CSV is empty.');
-    if(csvText.trim().startsWith('<'))throw new Error('The URL returned a web page, not CSV. Publish the worksheet as CSV.');
-
-    Papa.parse(csvText,{header:true,skipEmptyLines:true,complete:r=>{
-      if(!r.data.length){
-        $('status').textContent='No rows found for '+MONTH_LABELS[month];
-        if(fetchBtn){fetchBtn.disabled=false;fetchBtn.textContent='Fetch Data';}
-        if(showAlerts)alert('No CSV rows found for '+MONTH_LABELS[month]+'.');
-        return;
-      }
-
-      // Normalize the Sub Division header, including spaces, hyphens and BOM.
-      const fields=(r.meta&&r.meta.fields)?r.meta.fields:Object.keys(r.data[0]||{});
-      const cleanHeader=value=>String(value||'').replace(/^\uFEFF/,'').trim().toUpperCase().replace(/[\s-]+/g,'_');
-      const subField=fields.find(field=>['SUB_DIVISION','SUBDIVISION','SUB_DIVISION_NAME'].includes(cleanHeader(field)));
-      const sheetRows=r.data.map(row=>{
-        const cleaned={...row};
-        if(subField)cleaned.SUB_DIVISION=String(row[subField]??'').replace(/^\uFEFF/,'').trim();
-        // Make the selected worksheet's CHECKIN_DATE authoritative.
-        if(cleaned.CHECKIN_DATE||cleaned.checkin_date)cleaned.CHECKIN_D=cleaned.CHECKIN_DATE||cleaned.checkin_date;
-        return cleaned;
-      });
-
-      rawData=buildMonthData(month,sheetRows);
-      MONTH_DATA_CACHE[month]=rawData.slice();
-      $('status').textContent=MONTH_LABELS[month]+' data loaded • '+
-        rawData.length.toLocaleString('en-IN')+' records';
-      if(fetchBtn){fetchBtn.disabled=false;fetchBtn.textContent='Fetch Data';}
-      setDateRangeFromData();
-      refresh();
-      renderMonthComparison();
-      renderCacharBORanking();
-      const assignedSubDivisions=rawData.filter(row=>String(row.SUB_DIVISION||row.sub_division||'').trim()).length;
-      if(!subField||!assignedSubDivisions){
-        $('subdivisionWarning').innerHTML='<b>Sub Division data note:</b> the selected worksheet does not contain usable Sub Division values for all records. Division and office-level analysis will still be available; check the SUB_DIVISION column.';
-        $('subdivisionWarning').classList.remove('hidden');
-      }else{
-        $('subdivisionWarning').classList.add('hidden');
-      }
-    },error:e=>{
-      $('status').textContent='CSV parse failed for '+MONTH_LABELS[month];
-      if(fetchBtn){fetchBtn.disabled=false;fetchBtn.textContent='Fetch Data';}
-      if(showAlerts)alert(e.message);
-    }});
-  }catch(e){
-    if(isOctober){
-      rawData=INITIAL_DATA.slice();
-      setDateRangeFromData();
-      refresh();
+    rawData=data;
+    MONTH_DATA_CACHE[month]=data.slice();
+    $('status').textContent=MONTH_LABELS[month]+' data loaded successfully • '+data.length.toLocaleString('en-IN')+' records';
+    setDateRangeFromData();
+    refresh();
+    renderMonthComparison();
+    renderCacharBORanking();
+    const assignedSubDivisions=rawData.filter(row=>String(row.SUB_DIVISION||row.sub_division||'').trim()).length;
+    if(!assignedSubDivisions){
+      $('subdivisionWarning').innerHTML='<b>Sub Division data note:</b> the selected worksheet has no usable Sub Division values. Division and office-level analysis will still be available; check the SUB_DIVISION column.';
+      $('subdivisionWarning').classList.remove('hidden');
     }else{
-      rawData=[];
-      $('from').value='';
-      $('to').value='';
-      refresh();
+      $('subdivisionWarning').classList.add('hidden');
     }
-    $('status').textContent=MONTH_LABELS[month]+' sheet could not be loaded';
-    if(fetchBtn){fetchBtn.disabled=false;fetchBtn.textContent='Fetch Data';}
-    if(showAlerts)alert('Could not load '+MONTH_LABELS[month]+'. Check that the worksheet is published as CSV and publicly viewable. Details: '+e.message);
+  }catch(error){
+    if(requestId!==monthLoadSequence)return;
+    rawData=isOctober?INITIAL_DATA.slice():[];
+    if(isOctober){setDateRangeFromData();}else{$('from').value='';$('to').value='';}
+    refresh();
+    $('status').textContent='Unable to fetch '+MONTH_LABELS[month]+' data';
+    if(showAlerts)alert('Unable to fetch '+MONTH_LABELS[month]+'. '+error.message+'\n\nCheck that the selected worksheet is published to the web and that the published link is accessible.');
+  }finally{
+    if(requestId===monthLoadSequence&&fetchBtn){fetchBtn.disabled=false;fetchBtn.textContent='Fetch Data';}
   }
 }
 function setupSectionPdfExports(){
