@@ -26,6 +26,21 @@ button{background:var(--blue);color:white;border-color:var(--blue);font-weight:7
 .note{color:var(--muted);font-size:12px;flex-basis:100%}.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
 .kpi{padding:16px}.kpi .name{color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}.kpi .value{font-size:clamp(20px,2.5vw,30px);font-weight:800;margin-top:5px;color:var(--navy)}.kpi .sub{font-size:12px;color:var(--muted);margin-top:4px}
 
+
+.bo-rank-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:10px 0 14px}
+.bo-rank-stat{border:1px solid var(--line);background:#f7fafc;border-radius:9px;padding:12px}
+.bo-rank-stat span{display:block;color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+.bo-rank-stat strong{display:block;color:var(--navy);font-size:20px;margin-top:5px}
+.bo-rank-table{width:100%;border-collapse:collapse;min-width:680px}
+.bo-rank-table th,.bo-rank-table td{padding:9px 11px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+.bo-rank-table th:first-child,.bo-rank-table td:first-child,
+.bo-rank-table th:nth-child(2),.bo-rank-table td:nth-child(2){text-align:left}
+.bo-rank-table thead th{background:#f3f7fb;color:var(--navy);font-size:11px;text-transform:uppercase}
+.bo-rank-table tbody td{font-size:13px}
+.bo-rank-table .rank-no{font-weight:800;color:var(--navy)}
+.bo-rank-table .amount-cell{font-weight:800;color:var(--navy)}
+.bo-rank-table tr.unassigned-row{background:#fff9ed}
+@media(max-width:700px){.bo-rank-summary{grid-template-columns:1fr}.bo-rank-stat strong{font-size:18px}}
 .mom-panel{margin-bottom:16px}
 .mom-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:12px}
 .mom-heading h2{font-size:17px;margin:0 0 4px;color:var(--navy)}
@@ -77,6 +92,21 @@ button{background:var(--blue);color:white;border-color:var(--blue);font-weight:7
   </div>
   <div id="momContent" class="tablewrap">
     <div class="mom-loading">Loading October and November figures for comparison…</div>
+  </div>
+</section>
+<section class="panel wide" id="cacharBORanking">
+  <div class="mom-heading">
+    <div>
+      <h2>Cachar Division: Sub Division Ranking (BO Business Only)</h2>
+      <p id="cacharBORankingSubtitle">Ranked by total PLI + RPLI amount paid at Branch Offices only</p>
+    </div>
+    <span class="mom-filter-note">Head Office and Sub Office business excluded</span>
+  </div>
+  <div class="bo-rank-summary" id="cacharBOSummary">
+    <div class="bo-rank-stat"><span>Total BO business</span><strong>Loading…</strong></div>
+  </div>
+  <div id="cacharBORankingTable" class="tablewrap">
+    <div class="mom-loading">Loading Cachar Division Branch Office data…</div>
   </div>
 </section>
 <section class="insight" id="performanceInsights"><h2>Performance Comments</h2><div id="insightText">Performance observations will appear here after data loads.</div></section>
@@ -157,7 +187,93 @@ function group(rows,key){let m=new Map();rows.forEach(r=>{let k=r[key]||'Unassig
 function plot(id,data,layout={}){Plotly.react(id,data,{margin:{l:100,r:20,t:10,b:60},paper_bgcolor:'white',plot_bgcolor:'white',font:{family:'Arial',color:'#29465d',size:11},legend:{orientation:'h',y:1.12},...layout},{responsive:true,displaylogo:false})}
 function barRank(id,rows){let s=[...rows].sort((a,b)=>b.amount-a.amount);plot(id,[{type:'bar',orientation:'h',y:s.map(x=>x.name).reverse(),x:s.map(x=>x.amount).reverse(),marker:{color:'#1769aa'},hovertemplate:'%{y}<br>Amount paid: ₹%{x:,.0f}<extra></extra>'}],{margin:{l:150,r:20,t:10,b:45},xaxis:{title:'Total amount paid (₹)',tickformat:',.0f'},yaxis:{automargin:true}})}
 function table(id,rows,headers){$(id).innerHTML='<table><thead><tr>'+headers.map(h=>'<th>'+esc(h.label)+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+headers.map(h=>'<td>'+esc(h.format?h.format(r[h.key]):r[h.key])+'</td>').join('')+'</tr>').join('')+'</tbody></table>'}
-function render(){renderMonthComparison();let rows=filtered(),pli=rows.filter(r=>r.CARRIER_CODE==='PLI'),rpli=rows.filter(r=>r.CARRIER_CODE==='RPL'),amount=rows.reduce((s,r)=>s+r.AMOUNT_PAID,0);
+function renderCacharBORanking(){
+  const tableContainer=$('cacharBORankingTable');
+  const summaryContainer=$('cacharBOSummary');
+  if(!tableContainer||!summaryContainer)return;
+
+  const selectedMonth=$('month').value;
+  const monthRows=MONTH_DATA_CACHE[selectedMonth]||rawData;
+  const normalized=normalize(monthRows);
+  const isCachar=row=>String(row.DO_NAME||'').trim().toUpperCase()==='CACHAR';
+  const hasBO=row=>{
+    const name=String(row.BO_NAME||'').trim();
+    return name!==''&&!['NA','N/A','-','NULL','NONE'].includes(name.toUpperCase());
+  };
+
+  // This ranking is deliberately independent of the dashboard's Division,
+  // Office and date filters. It always covers Cachar Division BO business for
+  // the selected month, and excludes HO/SO-only records by requiring BO_NAME.
+  const boRows=normalized.filter(row=>isCachar(row)&&hasBO(row));
+  const bySubDivision=new Map();
+
+  for(const row of boRows){
+    const subDivision=String(row.SUB_DIVISION||'').trim()||'Unassigned';
+    if(!bySubDivision.has(subDivision)){
+      bySubDivision.set(subDivision,{
+        name:subDivision,policies:0,amount:0,pliPolicies:0,rpliPolicies:0,
+        pliAmount:0,rpliAmount:0,branchOffices:new Set()
+      });
+    }
+    const item=bySubDivision.get(subDivision);
+    item.policies++;
+    item.amount+=row.AMOUNT_PAID;
+    item.branchOffices.add(String(row.BO_NAME).trim());
+    if(row.CARRIER_CODE==='PLI'){
+      item.pliPolicies++;
+      item.pliAmount+=row.AMOUNT_PAID;
+    }else if(row.CARRIER_CODE==='RPL'){
+      item.rpliPolicies++;
+      item.rpliAmount+=row.AMOUNT_PAID;
+    }
+  }
+
+  const ranking=[...bySubDivision.values()]
+    .map(item=>({...item,branchOfficeCount:item.branchOffices.size}))
+    .sort((a,b)=>b.amount-a.amount||a.name.localeCompare(b.name));
+
+  const totalAmount=boRows.reduce((sum,row)=>sum+row.AMOUNT_PAID,0);
+  const totalBOs=new Set(boRows.map(row=>String(row.BO_NAME).trim())).size;
+  const assignedRows=boRows.filter(row=>String(row.SUB_DIVISION||'').trim()).length;
+  const monthLabel=MONTH_LABELS[selectedMonth]||selectedMonth;
+
+  summaryContainer.innerHTML=
+    '<div class="bo-rank-stat"><span>Total BO business • '+esc(monthLabel)+'</span><strong>'+money(totalAmount)+'</strong></div>'+
+    '<div class="bo-rank-stat"><span>BO policies indexed</span><strong>'+count(boRows.length)+'</strong></div>'+
+    '<div class="bo-rank-stat"><span>Branch Offices contributing</span><strong>'+count(totalBOs)+'</strong></div>';
+
+  $('cacharBORankingSubtitle').textContent=
+    'Cachar Division • '+monthLabel+' • Ranked by total PLI + RPLI amount paid at Branch Offices only';
+
+  if(!boRows.length){
+    tableContainer.innerHTML='<div class="mom-loading">No dated Cachar Division Branch Office records are available for '+esc(monthLabel)+'.</div>';
+    return;
+  }
+
+  const totalForShare=totalAmount||1;
+  tableContainer.innerHTML=
+    '<table class="bo-rank-table"><thead><tr>'+
+    '<th>Rank</th><th>Sub Division</th><th>BOs contributing</th><th>Policies</th>'+
+    '<th>PLI amount</th><th>RPLI amount</th><th>Total BO business</th><th>Share</th>'+
+    '</tr></thead><tbody>'+
+    ranking.map((item,index)=>{
+      const unassigned=item.name==='Unassigned';
+      return '<tr'+(unassigned?' class="unassigned-row"':'')+'>'+
+        '<td class="rank-no">'+(index+1)+'</td>'+
+        '<td>'+esc(item.name)+(unassigned?' <span class="mom-growth">(SUB_DIVISION missing)</span>':'')+'</td>'+
+        '<td>'+count(item.branchOfficeCount)+'</td>'+
+        '<td>'+count(item.policies)+'</td>'+
+        '<td>'+money(item.pliAmount)+'</td>'+
+        '<td>'+money(item.rpliAmount)+'</td>'+
+        '<td class="amount-cell">'+money(item.amount)+'</td>'+
+        '<td>'+((item.amount/totalForShare)*100).toFixed(1)+'%</td>'+
+        '</tr>';
+    }).join('')+
+    '</tbody></table>'+
+    '<div class="mom-growth" style="padding:8px 2px">Ranking is based on amount paid. '+count(assignedRows)+' of '+count(boRows.length)+' BO policy records have a Sub Division value. Records without a Sub Division are shown as Unassigned.</div>';
+}
+
+function render(){renderMonthComparison();renderCacharBORanking();let rows=filtered(),pli=rows.filter(r=>r.CARRIER_CODE==='PLI'),rpli=rows.filter(r=>r.CARRIER_CODE==='RPL'),amount=rows.reduce((s,r)=>s+r.AMOUNT_PAID,0);
 $('kPolicies').textContent=count(rows.length);$('kAmount').textContent=money(amount);$('kPli').textContent=count(pli.length);$('kPliAmt').textContent='Amount paid: '+money(pli.reduce((s,r)=>s+r.AMOUNT_PAID,0));$('kRpli').textContent=count(rpli.length);$('kRpliAmt').textContent='Amount paid: '+money(rpli.reduce((s,r)=>s+r.AMOUNT_PAID,0));$('status').textContent=count(rows.length)+' records';
 let divs=group(rows,'DO_NAME').sort((a,b)=>b.amount-a.amount);plot('divisionChart',[{type:'bar',name:'PLI',x:divs.map(x=>x.name),y:divs.map(x=>x.pliAmount),marker:{color:'#1769aa'}},{type:'bar',name:'RPLI',x:divs.map(x=>x.name),y:divs.map(x=>x.rpliAmount),marker:{color:'#e39a36'}}],{barmode:'group',margin:{l:65,r:10,t:15,b:105},xaxis:{tickangle:-35,automargin:true},yaxis:{title:'Amount paid (₹)',tickformat:'~s'}});
 // Show the current month when it has records; otherwise fall back to the latest month
@@ -438,6 +554,7 @@ async function loadSelectedMonth(showAlerts=true){
       setDateRangeFromData();
       refresh();
       renderMonthComparison();
+      renderCacharBORanking();
       ensureComparisonData();
       const assignedSubDivisions=rawData.filter(row=>String(row.SUB_DIVISION||row.sub_division||'').trim()).length;
       if(!subField||!assignedSubDivisions){
@@ -495,6 +612,7 @@ rawData=INITIAL_DATA;
 setDateRangeFromData();
 refresh();
 setupSectionPdfExports();
+renderCacharBORanking();
 $('month').addEventListener('change',()=>loadSelectedMonth(true));
 loadSelectedMonth(false);
 </script></body></html>
